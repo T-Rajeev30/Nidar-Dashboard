@@ -1,32 +1,28 @@
-// Single responsibility: name-based sign-in. No passwords: a member either
-// already exists (login) or is created on the spot when joining a team.
+// Name-based onboarding remains, but it establishes a server-managed session.
 const express = require('express');
 const Team = require('../models/Team');
 const Member = require('../models/Member');
 const { requiredString, parseEmail } = require('../utils/validation');
+const { issueSession, requireAuth, revokeSession, clearSession, publicMember } = require('../utils/auth');
 
 const router = express.Router();
 
-// POST /api/auth/login  { name }
-// Looks up an existing member by name (case-insensitive).
 router.post('/login', async (req, res, next) => {
   try {
     const name = requiredString(req.body.name, 'name', { max: 100 });
 
-    const member = await Member.findOne({ nameLower: name.trim().toLowerCase() }).populate('team');
+    const member = await Member.findOne({ nameLower: name.toLowerCase() }).populate('team');
     if (!member) {
-      return res.status(404).json({ error: 'No member with that name yet. Join a team first.' });
+      return res.status(404).json({ error: 'No member with that name yet. Join a team first.', code: 'MEMBER_NOT_FOUND' });
     }
 
-    res.json({ member });
+    await issueSession(res, member);
+    res.json({ member: publicMember(member) });
   } catch (err) {
     next(err);
   }
 });
 
-// POST /api/auth/join  { name, email, teamKey, role }
-// Creates a new member on the given team. Email is required so meeting
-// invites have somewhere to go.
 router.post('/join', async (req, res, next) => {
   try {
     const name = requiredString(req.body.name, 'name', { max: 100 });
@@ -36,7 +32,7 @@ router.post('/join', async (req, res, next) => {
 
     const team = await Team.findOne({ key: teamKey });
     if (!team) {
-      return res.status(404).json({ error: `Unknown team: ${teamKey}` });
+      return res.status(404).json({ error: `Unknown team: ${teamKey}`, code: 'TEAM_NOT_FOUND' });
     }
 
     const member = await Member.create({
@@ -47,7 +43,22 @@ router.post('/join', async (req, res, next) => {
     });
     const populated = await member.populate('team');
 
-    res.status(201).json({ member: populated });
+    await issueSession(res, populated);
+    res.status(201).json({ member: publicMember(populated) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/me', requireAuth, (req, res) => {
+  res.json({ member: publicMember(req.member) });
+});
+
+router.post('/logout', async (req, res, next) => {
+  try {
+    await revokeSession(req);
+    clearSession(res);
+    res.status(204).send();
   } catch (err) {
     next(err);
   }

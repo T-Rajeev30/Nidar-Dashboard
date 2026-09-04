@@ -2,9 +2,9 @@
 const express = require('express');
 const Meeting = require('../models/Meeting');
 const Member = require('../models/Member');
-const { sendMail } = require('../services/mailer');
-const { buildMeetingEmail } = require('../utils/meetingEmail');
-const { requiredString, optionalString, normalizeHttpUrl, parseFutureDate, parseObjectId, optionalObjectId, ValidationError } = require('../utils/validation');
+const { deliverMeetingInvite, populatedMeetingResponse } = require('../services/meetingNotifications');
+const { requiredString, optionalString, normalizeHttpUrl, parseFutureDate, parseObjectId, ValidationError } = require('../utils/validation');
+const { AppError } = require('../utils/validation');
 
 const router = express.Router();
 
@@ -22,62 +22,47 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// POST /api/meetings  { title, agenda, meetLink, scheduledAt, inviteeIds, organizerId }
-// Creates the meeting, then immediately emails every selected invitee.
+// POST /api/meetings  { title, agenda, meetLink, scheduledAt, inviteeIds }
+// Meeting persistence completes before notification delivery is attempted.
 router.post('/', async (req, res, next) => {
   try {
     const title = requiredString(req.body.title, 'title', { max: 240 });
     const agenda = optionalString(req.body.agenda, 'agenda');
     const meetLink = normalizeHttpUrl(req.body.meetLink, 'meetLink');
     const scheduledAt = parseFutureDate(req.body.scheduledAt);
-    const organizerId = optionalObjectId(req.body.organizerId, 'organizerId');
     if (!Array.isArray(req.body.inviteeIds) || req.body.inviteeIds.length === 0) throw new ValidationError('At least one invitee is required.');
     const inviteeIds = [...new Set(req.body.inviteeIds.map((id) => parseObjectId(id, 'inviteeId')))];
 
     const invitees = await Member.find({ _id: { $in: inviteeIds } });
     if (invitees.length !== inviteeIds.length) return res.status(404).json({ error: 'One or more invitees were not found.', code: 'NOT_FOUND' });
-    const organizer = organizerId ? await Member.findById(organizerId) : null;
-    if (organizerId && !organizer) return res.status(404).json({ error: 'Organizer not found.', code: 'NOT_FOUND' });
-    const emails = invitees.map((m) => m.email).filter(Boolean);
-
     const meeting = await Meeting.create({
       title,
       agenda,
       meetLink: meetLink || '',
       scheduledAt,
       invitees: invitees.map((m) => m._id),
-      organizer: organizerId,
+      organizer: req.member._id,
     });
+    await deliverMeetingInvite(meeting);
+    res.status(201).json(await populatedMeetingResponse(meeting));
+  } catch (err) {
+    next(err);
+  }
+});
 
-    // Send the email; don't fail the request if email sending has an issue —
-    // report it back so the UI can show a clear status instead.
-    try {
-      if (emails.length === 0) {
-        meeting.emailStatus = 'failed';
-      } else {
-        const { subject, text, html } = buildMeetingEmail({
-          title,
-          agenda,
-          meetLink,
-          scheduledAt,
-          inviteeNames: invitees.map((m) => m.name),
-          organizerName: organizer?.name || null,
-        });
-        await sendMail({ to: emails, subject, text, html });
-        meeting.emailStatus = 'sent';
-      }
-      await meeting.save();
-    } catch (mailErr) {
-      console.error('[meetings] email failed:', mailErr.message);
-      meeting.emailStatus = 'failed';
-      await meeting.save();
+// Retry delivery for the meeting's organizer. A sent notification is
+// idempotent; retrying it returns the existing meeting without sending again.
+router.post('/:id/notifications/retry', async (req, res, next) => {
+  try {
+    parseObjectId(req.params.id, 'meeting');
+    const meeting = await Meeting.findById(req.params.id);
+    if (!meeting) return res.status(404).json({ error: 'Meeting not found.', code: 'NOT_FOUND' });
+    if (!meeting.organizer || String(meeting.organizer) !== String(req.member._id)) {
+      throw new AppError('Only the meeting organizer can retry its notification.', 403, 'FORBIDDEN');
     }
-
-    const populated = await meeting.populate([
-      { path: 'invitees', select: 'name' },
-      { path: 'organizer', select: 'name' },
-    ]);
-    res.status(201).json(populated);
+    if (meeting.emailStatus === 'sent') return res.json(await populatedMeetingResponse(meeting));
+    await deliverMeetingInvite(meeting);
+    res.json(await populatedMeetingResponse(meeting));
   } catch (err) {
     next(err);
   }

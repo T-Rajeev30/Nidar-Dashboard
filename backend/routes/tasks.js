@@ -6,6 +6,7 @@ const Member = require('../models/Member');
 const { STATUSES } = require('../models/Task');
 const { requiredString, optionalString, parseObjectId, optionalObjectId, parseDate, ValidationError } = require('../utils/validation');
 const { MODULES } = require('../constants/modules');
+const { assertOwnTeam } = require('../utils/auth');
 
 const router = express.Router();
 
@@ -49,31 +50,29 @@ router.post('/seed-modules', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/tasks  { title, description, team, assignee, subProblemRef, dueDate, createdBy }
+// POST /api/tasks  { title, description, team, assignee, subProblemRef, dueDate }
 router.post('/', async (req, res, next) => {
   try {
     const title = requiredString(req.body.title, 'title', { max: 240 });
     const team = parseObjectId(req.body.team, 'team');
     const assignee = optionalObjectId(req.body.assignee, 'assignee');
-    const createdBy = optionalObjectId(req.body.createdBy, 'createdBy');
     const description = optionalString(req.body.description, 'description');
     const dueDate = req.body.dueDate ? parseDate(req.body.dueDate, 'dueDate') : null;
     const subProblemRef = req.body.subProblemRef == null || req.body.subProblemRef === '' ? null : Number(req.body.subProblemRef);
     if (subProblemRef != null && (!Number.isInteger(subProblemRef) || subProblemRef < 1 || subProblemRef > 15)) throw new ValidationError('subProblemRef must be between 1 and 15.');
-    const [teamDoc, assigneeDoc, creatorDoc] = await Promise.all([
+    assertOwnTeam(req.member, team);
+    const [teamDoc, assigneeDoc] = await Promise.all([
       Team.exists({ _id: team }), assignee ? Member.findById(assignee).select('team').lean() : null,
-      createdBy ? Member.exists({ _id: createdBy }) : null,
     ]);
     if (!teamDoc) return res.status(404).json({ error: 'Team not found.', code: 'NOT_FOUND' });
     if (assignee && !assigneeDoc) return res.status(404).json({ error: 'Assignee not found.', code: 'NOT_FOUND' });
     if (assigneeDoc && String(assigneeDoc.team) !== team) throw new ValidationError('Assignee must belong to the task team.');
-    if (createdBy && !creatorDoc) return res.status(404).json({ error: 'Creator not found.', code: 'NOT_FOUND' });
 
     const task = await Task.create({
       title,
       description,
       team,
-      assignee, subProblemRef, dueDate, createdBy,
+      assignee, subProblemRef, dueDate, createdBy: req.member._id,
     });
     await task.populate([{ path: 'assignee', select: 'name' }, { path: 'createdBy', select: 'name' }]);
     res.status(201).json(task);
@@ -102,6 +101,7 @@ router.patch('/:id', async (req, res, next) => {
     if ('status' in updates && !STATUSES.includes(updates.status)) throw new ValidationError('status is invalid.');
     const current = await Task.findById(req.params.id).select('team');
     if (!current) return res.status(404).json({ error: 'Task not found.', code: 'NOT_FOUND' });
+    assertOwnTeam(req.member, current.team);
     if ('assignee' in updates) {
       updates.assignee = optionalObjectId(updates.assignee, 'assignee');
       if (updates.assignee) {
@@ -125,8 +125,10 @@ router.patch('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     parseObjectId(req.params.id, 'task');
-    const task = await Task.findByIdAndDelete(req.params.id);
-    if (!task) return res.status(404).json({ error: 'Task not found.' });
+    const task = await Task.findById(req.params.id).select('team');
+    if (!task) return res.status(404).json({ error: 'Task not found.', code: 'NOT_FOUND' });
+    assertOwnTeam(req.member, task.team);
+    await Task.findByIdAndDelete(req.params.id);
     res.status(204).send();
   } catch (err) {
     next(err);

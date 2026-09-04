@@ -10,6 +10,8 @@ const meetingSchema = new mongoose.Schema(
     invitees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Member', required: true }],
     organizer: { type: mongoose.Schema.Types.ObjectId, ref: 'Member', default: null },
     emailStatus: { type: String, enum: ['pending', 'sent', 'failed'], default: 'pending' },
+    emailAttempts: { type: Number, min: 0, default: 0 },
+    lastEmailAttemptAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

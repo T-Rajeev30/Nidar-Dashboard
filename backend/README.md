@@ -2,6 +2,14 @@
 
 Express + MongoDB API for the mission dashboard. Deploys to Render.
 
+Authentication keeps the existing name-based onboarding flow, then issues a
+random, expiring server-side session in an HttpOnly `nidar_session` cookie.
+Protected routes derive the member and team from that session; request-body
+member/team fields are not authorization credentials. Set the exact frontend
+URL in `CORS_ORIGIN`. If the frontend and API are on different sites, use
+`SESSION_SAME_SITE=none` and HTTPS. Mutating requests also require an allowed
+`Origin`, providing the CSRF defense for this deployment model.
+
 ## Local setup
 
 ```bash
@@ -45,8 +53,10 @@ Server runs on http://localhost:5000. Health check: `GET /api/health`.
 
 | Method | Route              | Purpose                                   |
 |--------|---------------------|--------------------------------------------|
-| POST   | /api/auth/login     | Sign in by name                            |
+| POST   | /api/auth/login     | Establish a session for an existing member |
 | POST   | /api/auth/join      | Create a member on a team                  |
+| GET    | /api/auth/me        | Return the authenticated member            |
+| POST   | /api/auth/logout    | Revoke the current session                 |
 | GET    | /api/teams          | Teams + members + progress stats           |
 | GET    | /api/members        | List members (optional ?team=id)           |
 | GET    | /api/tasks          | List tasks (optional ?team=id&status=)     |
@@ -55,7 +65,8 @@ Server runs on http://localhost:5000. Health check: `GET /api/health`.
 | DELETE | /api/tasks/:id      | Delete a task                              |
 | GET    | /api/mission        | Mission deadline (Dec 15, 2026)            |
 | GET    | /api/meetings       | List all scheduled meetings                |
-| POST   | /api/meetings       | Schedule a meeting + email every invitee   |
+| POST   | /api/meetings       | Persist a meeting and attempt notification |
+| POST   | /api/meetings/:id/notifications/retry | Retry a failed notification |
 | GET    | /api/plans          | List plan/progress updates                 |
 | GET    | /api/plans/phases   | List valid project phases                  |
 | POST   | /api/plans          | Create a plan/progress update              |
@@ -67,10 +78,17 @@ Server runs on http://localhost:5000. Health check: `GET /api/health`.
 npm test
 ```
 
-Includes pure utility coverage plus database-free health, route-not-found, validation, and meeting-email safety checks.
+Includes pure utility coverage, database-free health/validation checks, and
+MongoDB-memory integration coverage for sessions, authorization, mutations,
+and failed/retried meeting notifications. Integration tests never use live
+credentials or a developer database.
 
 The API validates request data, IDs, dates, and external links at its boundary. Error responses contain a safe user-facing `error` message and a machine-readable `code`; internal 500 errors never expose implementation details.
 
 ## Trust model
 
-The current product uses name-based member access and does not implement passwords, sessions, or server-side authorization. Treat it as a trusted internal board only; do not expose it as a public or multi-tenant service without a separate authentication/authorization design.
+Name-based onboarding remains a product limitation: anyone who knows an
+existing member's name can establish that member's session. The session and
+authorization boundary is real after onboarding, but a public deployment
+should add an invitation or stronger identity verification before relying on
+it for sensitive data.

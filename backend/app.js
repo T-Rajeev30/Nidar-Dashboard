@@ -8,6 +8,7 @@ const authRouter = require('./routes/auth');
 const meetingsRouter = require('./routes/meetings');
 const plansRouter = require('./routes/plans');
 const { MISSION_DEADLINE } = require('./constants/mission');
+const { requireAuth, requireSameOrigin } = require('./utils/auth');
 
 const app = express();
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
@@ -22,16 +23,23 @@ app.use((req, res, next) => {
   });
   next();
 });
-app.use(cors({ origin: allowedOrigins }));
+app.use(cors({
+  origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin)),
+  credentials: true,
+}));
 app.use(express.json({ limit: '100kb' }));
+// SameSite cookies protect normal browser navigation. The explicit Origin
+// check also protects cookie-authenticated mutations when production uses
+// SameSite=None for a separately hosted frontend/API.
+app.use('/api', requireSameOrigin(allowedOrigins));
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.get('/api/mission', (req, res) => res.json({ deadline: MISSION_DEADLINE }));
-app.use('/api/teams', teamsRouter);
-app.use('/api/members', membersRouter);
-app.use('/api/tasks', tasksRouter);
 app.use('/api/auth', authRouter);
-app.use('/api/meetings', meetingsRouter);
-app.use('/api/plans', plansRouter);
+app.use('/api/teams', requireAuth, teamsRouter);
+app.use('/api/members', requireAuth, membersRouter);
+app.use('/api/tasks', requireAuth, tasksRouter);
+app.use('/api/meetings', requireAuth, meetingsRouter);
+app.use('/api/plans', requireAuth, plansRouter);
 app.use('/api', (req, res) => res.status(404).json({ error: 'Route not found.', code: 'NOT_FOUND' }));
 app.use(errorHandler);
 

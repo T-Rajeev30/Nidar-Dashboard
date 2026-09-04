@@ -5,6 +5,7 @@ const { PHASES } = require('../constants/phases');
 const Team = require('../models/Team');
 const Member = require('../models/Member');
 const { requiredString, optionalString, normalizeHttpUrl, parseDate, parseObjectId, optionalObjectId, ValidationError } = require('../utils/validation');
+const { assertOwnTeam } = require('../utils/auth');
 
 const router = express.Router();
 
@@ -12,8 +13,11 @@ const router = express.Router();
 router.get('/', async (req, res, next) => {
   try {
     const filter = {};
-    if (req.query.team) filter.team = req.query.team;
-    if (req.query.phase) filter.phase = req.query.phase;
+    if (req.query.team) filter.team = parseObjectId(req.query.team, 'team');
+    if (req.query.phase) {
+      if (!PHASES.includes(req.query.phase)) throw new ValidationError('phase is invalid.');
+      filter.phase = req.query.phase;
+    }
 
     const plans = await Plan.find(filter)
       .populate('createdBy', 'name')
@@ -41,18 +45,17 @@ router.post('/', async (req, res, next) => {
     const fileUrl = normalizeHttpUrl(req.body.fileUrl, 'fileUrl');
     const phase = req.body.phase || 'simulation';
     const forDate = parseDate(req.body.forDate, 'forDate');
-    const createdBy = optionalObjectId(req.body.createdBy, 'createdBy');
     if (!PHASES.includes(phase)) throw new ValidationError('phase is invalid.');
-    const [teamDoc, creator] = await Promise.all([Team.exists({ _id: team }), createdBy ? Member.exists({ _id: createdBy }) : null]);
+    assertOwnTeam(req.member, team);
+    const teamDoc = await Team.exists({ _id: team });
     if (!teamDoc) return res.status(404).json({ error: 'Team not found.', code: 'NOT_FOUND' });
-    if (createdBy && !creator) return res.status(404).json({ error: 'Creator not found.', code: 'NOT_FOUND' });
 
     const plan = await Plan.create({
       team,
       title,
       content, fileUrl, phase,
       forDate,
-      createdBy,
+      createdBy: req.member._id,
     });
 
     const populated = await plan.populate([
@@ -69,8 +72,10 @@ router.post('/', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     parseObjectId(req.params.id, 'plan');
-    const plan = await Plan.findByIdAndDelete(req.params.id);
-    if (!plan) return res.status(404).json({ error: 'Plan not found.' });
+    const plan = await Plan.findById(req.params.id).select('team');
+    if (!plan) return res.status(404).json({ error: 'Plan not found.', code: 'NOT_FOUND' });
+    assertOwnTeam(req.member, plan.team);
+    await Plan.findByIdAndDelete(req.params.id);
     res.status(204).send();
   } catch (err) {
     next(err);

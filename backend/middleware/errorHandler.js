@@ -1,7 +1,8 @@
 // Single responsibility: catch errors from any route and return a
 // consistent JSON error shape instead of leaking stack traces.
 function errorHandler(err, req, res, next) { // eslint-disable-line no-unused-vars
-  console.error('[error]', err.message);
+  // Keep server logs useful without copying database, SMTP, or request data.
+  console.error('[error]', err.name || 'Error', err.code || 'UNCLASSIFIED');
   if (err.code === 11000) {
     return res.status(409).json({ error: 'That name is already taken. Try a different one.', code: 'CONFLICT' });
   }
