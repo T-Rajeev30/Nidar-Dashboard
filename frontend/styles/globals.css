@@ -1,0 +1,53 @@
+/* Design tokens — mission-ops board theme.
+   Grid motif is literal: the AirMouse arena itself is grid-referenced,
+   so a faint schematic grid + monospace coordinate labels are functional,
+   not decorative. */
+:root {
+  --bg: #0e1216;
+  --panel: #161c22;
+  --panel-raised: #1c232b;
+  --line: #2a333c;
+  --text: #e8ecef;
+  --text-muted: #8b96a0;
+  --accent: #ff8a34;
+  --accent-dim: #b8611f;
+  --signal: #4fd8e0;
+  --status-todo: #6b7684;
+  --status-progress: #4fd8e0;
+  --status-blocked: #e5484d;
+  --status-done: #4dd68c;
+  --radius: 6px;
+  --font-ui: 'IBM Plex Sans', -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SFMono-Regular', monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  padding: 0;
+  margin: 0;
+  background:
+    linear-gradient(var(--line) 1px, transparent 1px) 0 0 / 40px 40px,
+    linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0 / 40px 40px,
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--accent);
+  color: #10131a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

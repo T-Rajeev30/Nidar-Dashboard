@@ -1,0 +1,38 @@
+// Single responsibility: one fetch wrapper the whole app calls through,
+// so the API base URL and error handling live in exactly one place.
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+async function request(path, options = {}) {
+  const res = await fetch(`${API_URL}/api${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+
+  if (res.status === 204) return null;
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || `Request failed (${res.status})`);
+  }
+  return data;
+}
+
+export const api = {
+  login: (name) => request('/auth/login', { method: 'POST', body: JSON.stringify({ name }) }),
+  join: (name, email, teamKey, role) =>
+    request('/auth/join', { method: 'POST', body: JSON.stringify({ name, email, teamKey, role }) }),
+  getTeams: () => request('/teams'),
+  getTasks: (teamId) => request(`/tasks${teamId ? `?team=${teamId}` : ''}`),
+  createTask: (payload) => request('/tasks', { method: 'POST', body: JSON.stringify(payload) }),
+  updateTask: (id, payload) =>
+    request(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  deleteTask: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
+  getMission: () => request('/mission'),
+  getMembers: () => request('/members'),
+  getMeetings: () => request('/meetings'),
+  createMeeting: (payload) => request('/meetings', { method: 'POST', body: JSON.stringify(payload) }),
+  getPlans: () => request('/plans'),
+  getPlanPhases: () => request('/plans/phases'),
+  createPlan: (payload) => request('/plans', { method: 'POST', body: JSON.stringify(payload) }),
+  deletePlan: (id) => request(`/plans/${id}`, { method: 'DELETE' }),
+};
