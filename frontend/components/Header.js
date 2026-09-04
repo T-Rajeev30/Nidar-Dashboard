@@ -1,5 +1,6 @@
 // Single responsibility: top bar — mission title, overall progress, signed-in
 // member, sign-out.
+import Link from 'next/link';
 import ProgressBar from './ProgressBar';
 import DeadlineCountdown from './DeadlineCountdown';
 
@@ -24,7 +25,9 @@ export default function Header({ member, overallProgress, deadline, onSignOut })
       <DeadlineCountdown deadline={deadline} />
 
       <div style={styles.memberBlock}>
-        <span style={styles.memberName}>{member?.name}</span>
+        <Link href="/profile" style={styles.profileLink}>
+          <span style={styles.memberName}>{member?.name}</span>
+        </Link>
         <span style={styles.memberTeam}>{member?.team?.displayName}</span>
         <button style={styles.signOut} onClick={onSignOut}>Sign out</button>
       </div>
@@ -50,7 +53,8 @@ const styles = {
   progressLabel: { fontSize: 11, color: 'var(--text-muted)' },
   progressBarWrap: { marginTop: 6 },
   memberBlock: { display: 'flex', alignItems: 'center', gap: 10, textAlign: 'right' },
-  memberName: { fontSize: 14, fontWeight: 600 },
+  profileLink: { textDecoration: 'none' },
+  memberName: { fontSize: 14, fontWeight: 600, color: 'var(--text)' },
   memberTeam: { fontSize: 12, color: 'var(--text-muted)' },
   signOut: {
     background: 'none',

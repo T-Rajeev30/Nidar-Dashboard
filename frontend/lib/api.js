@@ -24,11 +24,15 @@ export const api = {
   getTeams: () => request('/teams'),
   getTasks: (teamId) => request(`/tasks${teamId ? `?team=${teamId}` : ''}`),
   createTask: (payload) => request('/tasks', { method: 'POST', body: JSON.stringify(payload) }),
+  seedModules: () => request('/tasks/seed-modules', { method: 'POST' }),
   updateTask: (id, payload) =>
     request(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
   getMission: () => request('/mission'),
   getMembers: () => request('/members'),
+  updateMember: (id, payload) =>
+    request(`/members/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  getTasksForMember: (memberId) => request(`/tasks?assignee=${memberId}`),
   getMeetings: () => request('/meetings'),
   createMeeting: (payload) => request('/meetings', { method: 'POST', body: JSON.stringify(payload) }),
   getPlans: () => request('/plans'),

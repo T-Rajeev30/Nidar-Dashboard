@@ -11,6 +11,7 @@ router.get('/', async (req, res, next) => {
   try {
     const filter = {};
     if (req.query.team) filter.team = req.query.team;
+    if (req.query.assignee) filter.assignee = req.query.assignee;
     if (req.query.status) filter.status = req.query.status;
 
     const tasks = await Task.find(filter)
