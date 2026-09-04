@@ -12,6 +12,7 @@ export default function TeamColumn({ team, tasks, onAddTask, onUpdateTask, onDel
   const showSeedButton = team.key === 'core-technical' && tasks.length === 0;
 
   async function handleSeed() {
+    if (!onSeedModules) return;
     setSeeding(true);
     setSeedMessage('');
     try {
@@ -65,7 +66,7 @@ export default function TeamColumn({ team, tasks, onAddTask, onUpdateTask, onDel
             members={team.members}
             onUpdate={onUpdateTask}
             onDelete={onDeleteTask}
-            onOpenDetail={(t) => onOpenTask(t, team)}
+            onOpenDetail={(t) => onOpenTask?.(t, team)}
           />
         ))}
       </div>

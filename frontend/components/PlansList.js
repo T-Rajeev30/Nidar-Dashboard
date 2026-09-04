@@ -6,6 +6,7 @@ const PHASE_LABELS = {
   testing: 'Testing',
   final: 'Final',
 };
+import { safeExternalUrl } from '../lib/dashboard-utils.mjs';
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-IN', {
@@ -20,24 +21,26 @@ export default function PlansList({ plans, onDelete }) {
 
   return (
     <div style={styles.list}>
-      {plans.map((plan) => (
+      {plans.map((plan) => {
+        const fileUrl = safeExternalUrl(plan.fileUrl);
+        return (
         <div key={plan._id} style={styles.card}>
           <div style={styles.headerRow}>
             <span style={styles.phaseTag}>{PHASE_LABELS[plan.phase] || plan.phase}</span>
             <span style={styles.teamName}>{plan.team?.displayName}</span>
             <span style={styles.date}>{formatDate(plan.forDate)}</span>
-            <button style={styles.deleteBtn} onClick={() => onDelete(plan._id)} title="Delete plan">✕</button>
+            <button style={styles.deleteBtn} onClick={() => window.confirm(`Delete “${plan.title}”? This cannot be undone.`) && onDelete(plan._id)} aria-label={`Delete ${plan.title}`}>✕</button>
           </div>
           <p style={styles.title}>{plan.title}</p>
           {plan.content && <p style={styles.content}>{plan.content}</p>}
-          {plan.fileUrl && (
-            <a href={plan.fileUrl} target="_blank" rel="noreferrer" style={styles.fileLink}>
+          {fileUrl && (
+            <a href={fileUrl} target="_blank" rel="noreferrer" style={styles.fileLink}>
               View attached file →
             </a>
           )}
           {plan.createdBy?.name && <p style={styles.by}>Uploaded by {plan.createdBy.name}</p>}
         </div>
-      ))}
+      ); })}
     </div>
   );
 }

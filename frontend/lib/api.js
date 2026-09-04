@@ -2,17 +2,31 @@
 // so the API base URL and error handling live in exactly one place.
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
+export class ApiError extends Error {
+  constructor(message, status, code) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function request(path, options = {}) {
-  const res = await fetch(`${API_URL}/api${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
+  let res;
+  try {
+    res = await fetch(`${API_URL}/api${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    });
+  } catch {
+    throw new ApiError('Cannot reach the mission board. Check your connection and try again.', 0, 'NETWORK_ERROR');
+  }
 
   if (res.status === 204) return null;
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.error || `Request failed (${res.status})`);
+    throw new ApiError(data.error || `Request failed (${res.status})`, res.status, data.code);
   }
   return data;
 }

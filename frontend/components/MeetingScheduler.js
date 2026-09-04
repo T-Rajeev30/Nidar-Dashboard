@@ -57,12 +57,14 @@ export default function MeetingScheduler({ teams, onSchedule }) {
       <div style={styles.row}>
         <input
           style={styles.input}
+          aria-label="Meeting title"
           placeholder="Meeting title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
         <input
           style={styles.input}
+          aria-label="Meeting date and time"
           type="datetime-local"
           value={scheduledAt}
           onChange={(e) => setScheduledAt(e.target.value)}
@@ -71,6 +73,7 @@ export default function MeetingScheduler({ teams, onSchedule }) {
 
       <textarea
         style={styles.textarea}
+        aria-label="Meeting agenda"
         placeholder="Agenda (optional)"
         value={agenda}
         onChange={(e) => setAgenda(e.target.value)}
@@ -79,6 +82,7 @@ export default function MeetingScheduler({ teams, onSchedule }) {
 
       <input
         style={styles.input}
+        aria-label="Meeting link"
         placeholder="Meet link (Google Meet, Zoom, etc. — optional)"
         value={meetLink}
         onChange={(e) => setMeetLink(e.target.value)}

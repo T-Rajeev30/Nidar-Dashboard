@@ -1,5 +1,6 @@
 // Single responsibility: one task row — shows status/assignee, lets any
 // signed-in member update status, toggle the highlight flag, or delete it.
+import { useState } from 'react';
 const STATUS_OPTIONS = [
   { value: 'todo', label: 'To do', color: 'var(--status-todo)' },
   { value: 'in-progress', label: 'In progress', color: 'var(--status-progress)' },
@@ -8,6 +9,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function TaskItem({ task, members, onUpdate, onDelete, onOpenDetail }) {
+  const [busy, setBusy] = useState(false);
   const statusMeta = STATUS_OPTIONS.find((s) => s.value === task.status) || STATUS_OPTIONS[0];
   const cardClass = [
     'task-card',
@@ -15,11 +17,15 @@ export default function TaskItem({ task, members, onUpdate, onDelete, onOpenDeta
     task.highlighted ? 'task-card--highlighted' : '',
   ].join(' ').trim();
 
+  async function update(changes) { setBusy(true); try { await onUpdate(task._id, changes); } finally { setBusy(false); } }
+  async function remove() { if (!window.confirm(`Delete “${task.title}”? This cannot be undone.`)) return; setBusy(true); try { await onDelete(task._id); } finally { setBusy(false); } }
   return (
-    <div className={cardClass} style={styles.row}>
+    <div className={cardClass} style={styles.row} aria-busy={busy}>
       <button
         className={`highlight-toggle ${task.highlighted ? 'highlight-toggle--on' : ''}`}
-        onClick={() => onUpdate(task._id, { highlighted: !task.highlighted })}
+        onClick={() => update({ highlighted: !task.highlighted })}
+        disabled={busy}
+        aria-label={task.highlighted ? `Remove highlight from ${task.title}` : `Highlight ${task.title}`}
         title={task.highlighted ? 'Remove highlight' : 'Highlight this task'}
       >
         {task.highlighted ? '★' : '☆'}
@@ -27,7 +33,7 @@ export default function TaskItem({ task, members, onUpdate, onDelete, onOpenDeta
 
       <div style={styles.body}>
         <div style={styles.titleRow}>
-          <button style={styles.titleBtn} onClick={() => onOpenDetail(task)}>{task.title}</button>
+          <button style={styles.titleBtn} onClick={() => onOpenDetail?.(task)} disabled={busy}>{task.title}</button>
           {task.subProblemRef && (
             <span style={styles.subRef}>SP-{String(task.subProblemRef).padStart(2, '0')}</span>
           )}
@@ -37,7 +43,8 @@ export default function TaskItem({ task, members, onUpdate, onDelete, onOpenDeta
 
       <select
         value={task.status}
-        onChange={(e) => onUpdate(task._id, { status: e.target.value })}
+        onChange={(e) => update({ status: e.target.value })}
+        disabled={busy}
         style={{ ...styles.select, color: statusMeta.color }}
       >
         {STATUS_OPTIONS.map((s) => (
@@ -47,7 +54,8 @@ export default function TaskItem({ task, members, onUpdate, onDelete, onOpenDeta
 
       <select
         value={task.assignee?._id || task.assignee || ''}
-        onChange={(e) => onUpdate(task._id, { assignee: e.target.value || null })}
+        onChange={(e) => update({ assignee: e.target.value || null })}
+        disabled={busy}
         style={styles.select}
       >
         <option value="">Unassigned</option>
@@ -56,7 +64,7 @@ export default function TaskItem({ task, members, onUpdate, onDelete, onOpenDeta
         ))}
       </select>
 
-      <button style={styles.deleteBtn} onClick={() => onDelete(task._id)} title="Delete task">✕</button>
+      <button style={styles.deleteBtn} onClick={remove} disabled={busy} title="Delete task" aria-label={`Delete ${task.title}`}>✕</button>
     </div>
   );
 }

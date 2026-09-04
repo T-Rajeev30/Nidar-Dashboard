@@ -10,7 +10,14 @@ export function saveMember(member) {
 export function getMember() {
   if (typeof window === 'undefined') return null;
   const raw = window.localStorage.getItem(KEY);
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  try {
+    const member = JSON.parse(raw);
+    return member?._id && member?.name ? member : null;
+  } catch {
+    window.localStorage.removeItem(KEY);
+    return null;
+  }
 }
 
 export function clearMember() {

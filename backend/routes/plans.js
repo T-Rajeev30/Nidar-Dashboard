@@ -2,6 +2,9 @@
 const express = require('express');
 const Plan = require('../models/Plan');
 const { PHASES } = require('../constants/phases');
+const Team = require('../models/Team');
+const Member = require('../models/Member');
+const { requiredString, optionalString, normalizeHttpUrl, parseDate, parseObjectId, optionalObjectId, ValidationError } = require('../utils/validation');
 
 const router = express.Router();
 
@@ -32,19 +35,24 @@ router.get('/phases', (req, res) => {
 // POST /api/plans  { team, title, content, fileUrl, phase, forDate, createdBy }
 router.post('/', async (req, res, next) => {
   try {
-    const { team, title, content, fileUrl, phase, forDate, createdBy } = req.body;
-    if (!team || !title || !forDate) {
-      return res.status(400).json({ error: 'team, title, and forDate are required.' });
-    }
+    const team = parseObjectId(req.body.team, 'team');
+    const title = requiredString(req.body.title, 'title', { max: 240 });
+    const content = optionalString(req.body.content, 'content');
+    const fileUrl = normalizeHttpUrl(req.body.fileUrl, 'fileUrl');
+    const phase = req.body.phase || 'simulation';
+    const forDate = parseDate(req.body.forDate, 'forDate');
+    const createdBy = optionalObjectId(req.body.createdBy, 'createdBy');
+    if (!PHASES.includes(phase)) throw new ValidationError('phase is invalid.');
+    const [teamDoc, creator] = await Promise.all([Team.exists({ _id: team }), createdBy ? Member.exists({ _id: createdBy }) : null]);
+    if (!teamDoc) return res.status(404).json({ error: 'Team not found.', code: 'NOT_FOUND' });
+    if (createdBy && !creator) return res.status(404).json({ error: 'Creator not found.', code: 'NOT_FOUND' });
 
     const plan = await Plan.create({
       team,
       title,
-      content: content || '',
-      fileUrl: fileUrl || '',
-      phase: phase || 'simulation',
+      content, fileUrl, phase,
       forDate,
-      createdBy: createdBy || null,
+      createdBy,
     });
 
     const populated = await plan.populate([
@@ -60,6 +68,7 @@ router.post('/', async (req, res, next) => {
 // DELETE /api/plans/:id
 router.delete('/:id', async (req, res, next) => {
   try {
+    parseObjectId(req.params.id, 'plan');
     const plan = await Plan.findByIdAndDelete(req.params.id);
     if (!plan) return res.status(404).json({ error: 'Plan not found.' });
     res.status(204).send();

@@ -56,6 +56,10 @@ Server runs on http://localhost:5000. Health check: `GET /api/health`.
 | GET    | /api/mission        | Mission deadline (Dec 15, 2026)            |
 | GET    | /api/meetings       | List all scheduled meetings                |
 | POST   | /api/meetings       | Schedule a meeting + email every invitee   |
+| GET    | /api/plans          | List plan/progress updates                 |
+| GET    | /api/plans/phases   | List valid project phases                  |
+| POST   | /api/plans          | Create a plan/progress update              |
+| DELETE | /api/plans/:id      | Delete a plan/progress update              |
 
 ## Tests
 
@@ -63,4 +67,10 @@ Server runs on http://localhost:5000. Health check: `GET /api/health`.
 npm test
 ```
 
-Currently covers the pure progress-calculation logic in `utils/progress.js`.
+Includes pure utility coverage plus database-free health, route-not-found, validation, and meeting-email safety checks.
+
+The API validates request data, IDs, dates, and external links at its boundary. Error responses contain a safe user-facing `error` message and a machine-readable `code`; internal 500 errors never expose implementation details.
+
+## Trust model
+
+The current product uses name-based member access and does not implement passwords, sessions, or server-side authorization. Treat it as a trusted internal board only; do not expose it as a public or multi-tenant service without a separate authentication/authorization design.

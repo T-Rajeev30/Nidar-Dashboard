@@ -2,6 +2,7 @@
 // and let a member update their own email/role.
 const express = require('express');
 const Member = require('../models/Member');
+const { parseObjectId } = require('../utils/validation');
 
 const router = express.Router();
 
@@ -9,7 +10,7 @@ const router = express.Router();
 router.get('/', async (req, res, next) => {
   try {
     const filter = {};
-    if (req.query.team) filter.team = req.query.team;
+    if (req.query.team) filter.team = parseObjectId(req.query.team, 'team');
 
     const members = await Member.find(filter).select('name role team').lean();
     res.json(members);

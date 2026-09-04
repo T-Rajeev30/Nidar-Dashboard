@@ -3,6 +3,7 @@
 const express = require('express');
 const Team = require('../models/Team');
 const Member = require('../models/Member');
+const { requiredString, parseEmail } = require('../utils/validation');
 
 const router = express.Router();
 
@@ -10,10 +11,7 @@ const router = express.Router();
 // Looks up an existing member by name (case-insensitive).
 router.post('/login', async (req, res, next) => {
   try {
-    const { name } = req.body;
-    if (!name || !name.trim()) {
-      return res.status(400).json({ error: 'Name is required.' });
-    }
+    const name = requiredString(req.body.name, 'name', { max: 100 });
 
     const member = await Member.findOne({ nameLower: name.trim().toLowerCase() }).populate('team');
     if (!member) {
@@ -31,16 +29,10 @@ router.post('/login', async (req, res, next) => {
 // invites have somewhere to go.
 router.post('/join', async (req, res, next) => {
   try {
-    const { name, email, teamKey, role } = req.body;
-    if (!name || !name.trim()) {
-      return res.status(400).json({ error: 'Name is required.' });
-    }
-    if (!email || !email.trim()) {
-      return res.status(400).json({ error: 'Email is required so you can be invited to meetings.' });
-    }
-    if (!teamKey) {
-      return res.status(400).json({ error: 'teamKey is required.' });
-    }
+    const name = requiredString(req.body.name, 'name', { max: 100 });
+    const email = parseEmail(req.body.email);
+    const teamKey = requiredString(req.body.teamKey, 'teamKey', { max: 100 });
+    const role = typeof req.body.role === 'string' ? req.body.role.trim().slice(0, 100) : '';
 
     const team = await Team.findOne({ key: teamKey });
     if (!team) {
@@ -48,10 +40,10 @@ router.post('/join', async (req, res, next) => {
     }
 
     const member = await Member.create({
-      name: name.trim(),
-      email: email.trim(),
+      name,
+      email,
       team: team._id,
-      role: role || '',
+      role,
     });
     const populated = await member.populate('team');
 

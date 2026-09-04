@@ -32,6 +32,20 @@ test('buildMeetingEmail escapes HTML in user-provided text', () => {
   assert.match(html, /&lt;script&gt;/);
 });
 
+test('buildMeetingEmail escapes quotes in link attributes', () => {
+  const { html } = buildMeetingEmail({
+    title: 'Review',
+    agenda: '',
+    meetLink: 'https://example.com/?q=" onmouseover="alert(1)',
+    scheduledAt: '2026-09-10T10:00:00+05:30',
+    inviteeNames: ['Rajeev'],
+    organizerName: null,
+  });
+
+  assert.ok(!html.includes('onmouseover="alert(1)'));
+  assert.match(html, /&quot;/);
+});
+
 test('buildMeetingEmail omits agenda and organizer lines when not provided', () => {
   const { text } = buildMeetingEmail({
     title: 'Quick check-in',

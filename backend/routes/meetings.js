@@ -4,6 +4,7 @@ const Meeting = require('../models/Meeting');
 const Member = require('../models/Member');
 const { sendMail } = require('../services/mailer');
 const { buildMeetingEmail } = require('../utils/meetingEmail');
+const { requiredString, optionalString, normalizeHttpUrl, parseFutureDate, parseObjectId, optionalObjectId, ValidationError } = require('../utils/validation');
 
 const router = express.Router();
 
@@ -22,19 +23,21 @@ router.get('/', async (req, res, next) => {
 });
 
 // POST /api/meetings  { title, agenda, meetLink, scheduledAt, inviteeIds, organizerId }
-// Creates the meeting, then immediately emails every invitee (and organizer).
+// Creates the meeting, then immediately emails every selected invitee.
 router.post('/', async (req, res, next) => {
   try {
-    const { title, agenda, meetLink, scheduledAt, inviteeIds, organizerId } = req.body;
-
-    if (!title || !scheduledAt || !Array.isArray(inviteeIds) || inviteeIds.length === 0) {
-      return res.status(400).json({ error: 'title, scheduledAt, and at least one invitee are required.' });
-    }
+    const title = requiredString(req.body.title, 'title', { max: 240 });
+    const agenda = optionalString(req.body.agenda, 'agenda');
+    const meetLink = normalizeHttpUrl(req.body.meetLink, 'meetLink');
+    const scheduledAt = parseFutureDate(req.body.scheduledAt);
+    const organizerId = optionalObjectId(req.body.organizerId, 'organizerId');
+    if (!Array.isArray(req.body.inviteeIds) || req.body.inviteeIds.length === 0) throw new ValidationError('At least one invitee is required.');
+    const inviteeIds = [...new Set(req.body.inviteeIds.map((id) => parseObjectId(id, 'inviteeId')))];
 
     const invitees = await Member.find({ _id: { $in: inviteeIds } });
-    if (invitees.length === 0) {
-      return res.status(400).json({ error: 'None of the given invitee IDs matched a member.' });
-    }
+    if (invitees.length !== inviteeIds.length) return res.status(404).json({ error: 'One or more invitees were not found.', code: 'NOT_FOUND' });
+    const organizer = organizerId ? await Member.findById(organizerId) : null;
+    if (organizerId && !organizer) return res.status(404).json({ error: 'Organizer not found.', code: 'NOT_FOUND' });
     const emails = invitees.map((m) => m.email).filter(Boolean);
 
     const meeting = await Meeting.create({
@@ -43,7 +46,7 @@ router.post('/', async (req, res, next) => {
       meetLink: meetLink || '',
       scheduledAt,
       invitees: invitees.map((m) => m._id),
-      organizer: organizerId || null,
+      organizer: organizerId,
     });
 
     // Send the email; don't fail the request if email sending has an issue —
@@ -52,7 +55,6 @@ router.post('/', async (req, res, next) => {
       if (emails.length === 0) {
         meeting.emailStatus = 'failed';
       } else {
-        const organizer = organizerId ? await Member.findById(organizerId) : null;
         const { subject, text, html } = buildMeetingEmail({
           title,
           agenda,

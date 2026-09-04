@@ -29,6 +29,22 @@ npm run dev                 # http://localhost:3000
 
 Open http://localhost:3000, type your name, pick your team, and start adding tasks.
 
+## Product workflow
+
+- Use the task toolbar to search all team work or filter it by status; use **Refresh** to recover from a failed or stale load.
+- Add team plans as dated accountability updates and use safe `http`/`https` links for supporting material.
+- Schedule meetings from the board. A meeting can be saved even when SMTP delivery fails; the board reports that state clearly.
+- This is a trusted internal board with name-based device-local member access. It is not password authentication or authorization.
+
+## Verification
+
+```bash
+cd backend && npm test
+cd ../frontend && npm run lint && npm test && npm run build
+```
+
+Never add a live MongoDB URI, Gmail account, or app password to an `.env.example` file. Use the placeholders and create ignored local `.env` files instead.
+
 ## Deployment order
 
 1. **MongoDB Atlas** — free cluster, get the connection string (see `backend/README.md`)

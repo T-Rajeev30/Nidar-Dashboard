@@ -2,6 +2,9 @@
 const express = require('express');
 const Task = require('../models/Task');
 const Team = require('../models/Team');
+const Member = require('../models/Member');
+const { STATUSES } = require('../models/Task');
+const { requiredString, optionalString, parseObjectId, optionalObjectId, parseDate, ValidationError } = require('../utils/validation');
 const { MODULES } = require('../constants/modules');
 
 const router = express.Router();
@@ -10,9 +13,12 @@ const router = express.Router();
 router.get('/', async (req, res, next) => {
   try {
     const filter = {};
-    if (req.query.team) filter.team = req.query.team;
-    if (req.query.assignee) filter.assignee = req.query.assignee;
-    if (req.query.status) filter.status = req.query.status;
+    if (req.query.team) filter.team = parseObjectId(req.query.team, 'team');
+    if (req.query.assignee) filter.assignee = parseObjectId(req.query.assignee, 'assignee');
+    if (req.query.status) {
+      if (!STATUSES.includes(req.query.status)) throw new ValidationError('status is invalid.');
+      filter.status = req.query.status;
+    }
 
     const tasks = await Task.find(filter)
       .populate('assignee', 'name')
@@ -26,61 +32,50 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// POST /api/tasks/seed-modules
-// One-click seed: pushes the 15 AirMouse sub-problem modules into Core
-// Technical's task list. Safe to call more than once — skips any module
-// that already has a task (matched by team + subProblemRef).
+// POST /api/tasks/seed-modules — idempotently seed the AirMouse modules.
 router.post('/seed-modules', async (req, res, next) => {
   try {
     const team = await Team.findOne({ key: 'core-technical' });
-    if (!team) {
-      return res.status(404).json({ error: 'core-technical team not found.' });
-    }
-
+    if (!team) return res.status(404).json({ error: 'core-technical team not found.' });
     let created = 0;
     let skipped = 0;
-
-    for (const m of MODULES) {
-      const existing = await Task.findOne({ team: team._id, subProblemRef: m.id });
-      if (existing) {
-        skipped += 1;
-        continue;
-      }
-
-      await Task.create({
-        title: `SP-${String(m.id).padStart(2, '0')}: ${m.title}`,
-        description: m.desc,
-        team: team._id,
-        status: 'todo',
-        subProblemRef: m.id,
-      });
+    for (const module of MODULES) {
+      const existing = await Task.findOne({ team: team._id, subProblemRef: module.id });
+      if (existing) { skipped += 1; continue; }
+      await Task.create({ title: `SP-${String(module.id).padStart(2, '0')}: ${module.title}`, description: module.desc, team: team._id, status: 'todo', subProblemRef: module.id });
       created += 1;
     }
-
     res.json({ created, skipped });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
 // POST /api/tasks  { title, description, team, assignee, subProblemRef, dueDate, createdBy }
 router.post('/', async (req, res, next) => {
   try {
-    const { title, description, team, assignee, subProblemRef, dueDate, createdBy } = req.body;
-    if (!title || !team) {
-      return res.status(400).json({ error: 'title and team are required.' });
-    }
+    const title = requiredString(req.body.title, 'title', { max: 240 });
+    const team = parseObjectId(req.body.team, 'team');
+    const assignee = optionalObjectId(req.body.assignee, 'assignee');
+    const createdBy = optionalObjectId(req.body.createdBy, 'createdBy');
+    const description = optionalString(req.body.description, 'description');
+    const dueDate = req.body.dueDate ? parseDate(req.body.dueDate, 'dueDate') : null;
+    const subProblemRef = req.body.subProblemRef == null || req.body.subProblemRef === '' ? null : Number(req.body.subProblemRef);
+    if (subProblemRef != null && (!Number.isInteger(subProblemRef) || subProblemRef < 1 || subProblemRef > 15)) throw new ValidationError('subProblemRef must be between 1 and 15.');
+    const [teamDoc, assigneeDoc, creatorDoc] = await Promise.all([
+      Team.exists({ _id: team }), assignee ? Member.findById(assignee).select('team').lean() : null,
+      createdBy ? Member.exists({ _id: createdBy }) : null,
+    ]);
+    if (!teamDoc) return res.status(404).json({ error: 'Team not found.', code: 'NOT_FOUND' });
+    if (assignee && !assigneeDoc) return res.status(404).json({ error: 'Assignee not found.', code: 'NOT_FOUND' });
+    if (assigneeDoc && String(assigneeDoc.team) !== team) throw new ValidationError('Assignee must belong to the task team.');
+    if (createdBy && !creatorDoc) return res.status(404).json({ error: 'Creator not found.', code: 'NOT_FOUND' });
 
     const task = await Task.create({
       title,
       description,
       team,
-      assignee: assignee || null,
-      subProblemRef: subProblemRef || null,
-      dueDate: dueDate || null,
-      createdBy: createdBy || null,
+      assignee, subProblemRef, dueDate, createdBy,
     });
-
+    await task.populate([{ path: 'assignee', select: 'name' }, { path: 'createdBy', select: 'name' }]);
     res.status(201).json(task);
   } catch (err) {
     next(err);
@@ -90,17 +85,35 @@ router.post('/', async (req, res, next) => {
 // PATCH /api/tasks/:id  { status?, assignee?, title?, description?, dueDate? }
 router.patch('/:id', async (req, res, next) => {
   try {
+    parseObjectId(req.params.id, 'task');
     const allowed = ['status', 'assignee', 'title', 'description', 'dueDate', 'subProblemRef', 'highlighted'];
     const updates = {};
     for (const key of allowed) {
       if (key in req.body) updates[key] = req.body[key];
     }
-
+    if (Object.keys(updates).length === 0) throw new ValidationError('Provide at least one task field to update.');
+    if ('title' in updates) updates.title = requiredString(updates.title, 'title', { max: 240 });
+    if ('description' in updates) updates.description = optionalString(updates.description, 'description');
+    if ('dueDate' in updates) updates.dueDate = updates.dueDate ? parseDate(updates.dueDate, 'dueDate') : null;
+    if ('subProblemRef' in updates) {
+      updates.subProblemRef = updates.subProblemRef == null || updates.subProblemRef === '' ? null : Number(updates.subProblemRef);
+      if (updates.subProblemRef != null && (!Number.isInteger(updates.subProblemRef) || updates.subProblemRef < 1 || updates.subProblemRef > 15)) throw new ValidationError('subProblemRef must be between 1 and 15.');
+    }
+    if ('status' in updates && !STATUSES.includes(updates.status)) throw new ValidationError('status is invalid.');
+    const current = await Task.findById(req.params.id).select('team');
+    if (!current) return res.status(404).json({ error: 'Task not found.', code: 'NOT_FOUND' });
+    if ('assignee' in updates) {
+      updates.assignee = optionalObjectId(updates.assignee, 'assignee');
+      if (updates.assignee) {
+        const assignee = await Member.findById(updates.assignee).select('team').lean();
+        if (!assignee) return res.status(404).json({ error: 'Assignee not found.', code: 'NOT_FOUND' });
+        if (String(assignee.team) !== String(current.team)) throw new ValidationError('Assignee must belong to the task team.');
+      }
+    }
     const task = await Task.findByIdAndUpdate(req.params.id, updates, {
       new: true,
       runValidators: true,
-    });
-    if (!task) return res.status(404).json({ error: 'Task not found.' });
+    }).populate([{ path: 'assignee', select: 'name' }, { path: 'createdBy', select: 'name' }]);
 
     res.json(task);
   } catch (err) {
@@ -111,6 +124,7 @@ router.patch('/:id', async (req, res, next) => {
 // DELETE /api/tasks/:id
 router.delete('/:id', async (req, res, next) => {
   try {
+    parseObjectId(req.params.id, 'task');
     const task = await Task.findByIdAndDelete(req.params.id);
     if (!task) return res.status(404).json({ error: 'Task not found.' });
     res.status(204).send();

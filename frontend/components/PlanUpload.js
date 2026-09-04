@@ -1,6 +1,7 @@
 // Single responsibility: form to upload a plan/progress entry for a chosen
 // team — text content, an optional file link, a phase tag, and a date.
 import { useState } from 'react';
+import { localDateInputValue } from '../lib/dashboard-utils.mjs';
 
 const PHASES = [
   { value: 'simulation', label: 'Simulation' },
@@ -9,17 +10,13 @@ const PHASES = [
   { value: 'final', label: 'Final' },
 ];
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export default function PlanUpload({ teams, defaultTeamId, onUpload }) {
   const [teamId, setTeamId] = useState(defaultTeamId || (teams[0]?._id ?? ''));
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [fileUrl, setFileUrl] = useState('');
   const [phase, setPhase] = useState('simulation');
-  const [forDate, setForDate] = useState(todayISO());
+  const [forDate, setForDate] = useState(localDateInputValue());
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState(null);
 
@@ -33,7 +30,7 @@ export default function PlanUpload({ teams, defaultTeamId, onUpload }) {
     setSubmitting(true);
     setStatus(null);
     try {
-      await onUpload({
+      const saved = await onUpload({
         team: teamId,
         title: title.trim(),
         content: content.trim(),
@@ -41,6 +38,10 @@ export default function PlanUpload({ teams, defaultTeamId, onUpload }) {
         phase,
         forDate,
       });
+      if (!saved) {
+        setStatus({ ok: false, message: 'Plan was not posted. Your draft is still here—review the error and try again.' });
+        return;
+      }
       setStatus({ ok: true, message: 'Plan uploaded.' });
       setTitle('');
       setContent('');
@@ -55,18 +56,19 @@ export default function PlanUpload({ teams, defaultTeamId, onUpload }) {
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
       <div style={styles.row}>
-        <select style={styles.input} value={teamId} onChange={(e) => setTeamId(e.target.value)}>
+        <select style={styles.input} aria-label="Team" value={teamId} onChange={(e) => setTeamId(e.target.value)}>
           {teams.map((t) => (
             <option key={t._id} value={t._id}>{t.displayName}</option>
           ))}
         </select>
-        <select style={styles.input} value={phase} onChange={(e) => setPhase(e.target.value)}>
+        <select style={styles.input} aria-label="Project phase" value={phase} onChange={(e) => setPhase(e.target.value)}>
           {PHASES.map((p) => (
             <option key={p.value} value={p.value}>{p.label}</option>
           ))}
         </select>
         <input
           style={styles.input}
+          aria-label="Plan date"
           type="date"
           value={forDate}
           onChange={(e) => setForDate(e.target.value)}
@@ -75,6 +77,7 @@ export default function PlanUpload({ teams, defaultTeamId, onUpload }) {
 
       <input
         style={styles.input}
+        aria-label="Plan title"
         placeholder="Plan title (e.g. 'Week 1 sim progress')"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
@@ -82,6 +85,7 @@ export default function PlanUpload({ teams, defaultTeamId, onUpload }) {
 
       <textarea
         style={styles.textarea}
+        aria-label="Plan details"
         placeholder="What's the plan / what got done — write it out here"
         value={content}
         onChange={(e) => setContent(e.target.value)}
@@ -90,6 +94,7 @@ export default function PlanUpload({ teams, defaultTeamId, onUpload }) {
 
       <input
         style={styles.input}
+        aria-label="Attached file link"
         placeholder="Optional file link (Drive, Notion, GitHub, etc.)"
         value={fileUrl}
         onChange={(e) => setFileUrl(e.target.value)}

@@ -17,9 +17,19 @@ Visit http://localhost:3000.
 
 There are no passwords. Type your name:
 - If a member with that name already exists, you're signed in.
-- If not, you're asked to pick a team (Core Technical / Design & CAD / Social) and join.
+- If not, you're asked to pick a team (Core Technical / Design & CAD / Social / Documentation) and join.
 
 Your identity is stored in `localStorage` on this device only.
+
+This is convenient member access for a trusted internal board, not password authentication or authorization.
+
+## Checks
+
+```bash
+npm run lint
+npm test
+npm run build
+```
 
 ## Deploying to Vercel
 
@@ -33,7 +43,7 @@ Once deployed, go back to your Render backend's `CORS_ORIGIN` env var and set it
 ## Structure
 
 - `pages/index.js` — sign-in / join-a-team screen
-- `pages/dashboard.js` — the ops board (3 team columns, tasks, progress)
+- `pages/dashboard.js` — the ops board (four team columns, task filters, plans, and meetings)
 - `components/` — one file per UI piece (Header, TeamColumn, TaskItem, AddTaskForm, ProgressBar)
 - `lib/api.js` — the only place that talks to the backend
 - `lib/session.js` — localStorage helpers for the signed-in member
