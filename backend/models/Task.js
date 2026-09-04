@@ -12,6 +12,7 @@ const taskSchema = new mongoose.Schema(
     status: { type: String, enum: STATUSES, default: 'todo' },
     subProblemRef: { type: Number, min: 1, max: 15, default: null }, // links to the 15 sub-problem breakdown
     dueDate: { type: Date, default: null },
+    highlighted: { type: Boolean, default: false }, // flagged by any member as important — visible to everyone
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Member', default: null },
   },
   { timestamps: true }

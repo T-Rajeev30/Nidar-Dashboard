@@ -1,5 +1,5 @@
 // Single responsibility: one task row — shows status/assignee, lets any
-// signed-in member update status or delete it.
+// signed-in member update status, toggle the highlight flag, or delete it.
 const STATUS_OPTIONS = [
   { value: 'todo', label: 'To do', color: 'var(--status-todo)' },
   { value: 'in-progress', label: 'In progress', color: 'var(--status-progress)' },
@@ -7,16 +7,27 @@ const STATUS_OPTIONS = [
   { value: 'done', label: 'Done', color: 'var(--status-done)' },
 ];
 
-export default function TaskItem({ task, members, onUpdate, onDelete }) {
+export default function TaskItem({ task, members, onUpdate, onDelete, onOpenDetail }) {
   const statusMeta = STATUS_OPTIONS.find((s) => s.value === task.status) || STATUS_OPTIONS[0];
+  const cardClass = [
+    'task-card',
+    `task-card--${task.status}`,
+    task.highlighted ? 'task-card--highlighted' : '',
+  ].join(' ').trim();
 
   return (
-    <div style={styles.row}>
-      <span style={{ ...styles.dot, background: statusMeta.color }} />
+    <div className={cardClass} style={styles.row}>
+      <button
+        className={`highlight-toggle ${task.highlighted ? 'highlight-toggle--on' : ''}`}
+        onClick={() => onUpdate(task._id, { highlighted: !task.highlighted })}
+        title={task.highlighted ? 'Remove highlight' : 'Highlight this task'}
+      >
+        {task.highlighted ? '★' : '☆'}
+      </button>
 
       <div style={styles.body}>
         <div style={styles.titleRow}>
-          <span style={styles.title}>{task.title}</span>
+          <button style={styles.titleBtn} onClick={() => onOpenDetail(task)}>{task.title}</button>
           {task.subProblemRef && (
             <span style={styles.subRef}>SP-{String(task.subProblemRef).padStart(2, '0')}</span>
           )}
@@ -27,7 +38,7 @@ export default function TaskItem({ task, members, onUpdate, onDelete }) {
       <select
         value={task.status}
         onChange={(e) => onUpdate(task._id, { status: e.target.value })}
-        style={styles.select}
+        style={{ ...styles.select, color: statusMeta.color }}
       >
         {STATUS_OPTIONS.map((s) => (
           <option key={s.value} value={s.value}>{s.label}</option>
@@ -52,16 +63,20 @@ export default function TaskItem({ task, members, onUpdate, onDelete }) {
 
 const styles = {
   row: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 10,
-    padding: '10px 8px',
-    borderBottom: '1px solid var(--line)',
+    borderRadius: 4,
   },
-  dot: { width: 8, height: 8, borderRadius: '50%', marginTop: 6, flexShrink: 0 },
   body: { flex: 1, minWidth: 0 },
   titleRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  title: { fontSize: 14, fontWeight: 500 },
+  titleBtn: {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    fontSize: 14,
+    fontWeight: 500,
+    color: 'var(--text)',
+    textAlign: 'left',
+    cursor: 'pointer',
+  },
   subRef: {
     fontFamily: 'var(--font-mono)',
     fontSize: 10,
@@ -74,7 +89,6 @@ const styles = {
   select: {
     background: 'var(--panel-raised)',
     border: '1px solid var(--line)',
-    color: 'var(--text)',
     borderRadius: 4,
     fontSize: 12,
     padding: '4px 6px',

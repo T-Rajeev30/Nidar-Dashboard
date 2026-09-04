@@ -8,6 +8,7 @@ import MeetingScheduler from '../components/MeetingScheduler';
 import MeetingsList from '../components/MeetingsList';
 import PlanUpload from '../components/PlanUpload';
 import PlansList from '../components/PlansList';
+import TaskDetailModal from '../components/TaskDetailModal';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -19,6 +20,8 @@ export default function Dashboard() {
   const [deadline, setDeadline] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedTeam, setSelectedTeam] = useState(null);
 
   const loadAll = useCallback(async () => {
     setError('');
@@ -41,8 +44,11 @@ export default function Dashboard() {
       setMeetings(meetingsData);
       setDeadline(missionData.deadline);
       setPlans(plansData);
+
+      return map;
     } catch (err) {
       setError(err.message);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -65,12 +71,34 @@ export default function Dashboard() {
 
   async function handleUpdateTask(taskId, updates) {
     await api.updateTask(taskId, updates);
-    loadAll();
+    const map = await loadAll();
+    // Keep the open detail panel showing fresh data instead of the stale
+    // pre-update task object.
+    if (map && selectedTeam) {
+      const refreshed = (map[selectedTeam._id] || []).find((t) => t._id === taskId);
+      if (refreshed) setSelectedTask(refreshed);
+    }
   }
 
   async function handleDeleteTask(taskId) {
     await api.deleteTask(taskId);
     loadAll();
+  }
+
+  function handleOpenTask(task, team) {
+    setSelectedTask(task);
+    setSelectedTeam(team);
+  }
+
+  function handleCloseTaskDetail() {
+    setSelectedTask(null);
+    setSelectedTeam(null);
+  }
+
+  async function handleSeedModules() {
+    const result = await api.seedModules();
+    await loadAll();
+    return result;
   }
 
   async function handleScheduleMeeting(payload) {
@@ -120,9 +148,22 @@ export default function Dashboard() {
             onAddTask={handleAddTask}
             onUpdateTask={handleUpdateTask}
             onDeleteTask={handleDeleteTask}
+            onSeedModules={handleSeedModules}
+            onOpenTask={handleOpenTask}
           />
         ))}
       </main>
+
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          members={selectedTeam?.members || []}
+          teamName={selectedTeam?.displayName || ''}
+          onUpdate={handleUpdateTask}
+          onDelete={handleDeleteTask}
+          onClose={handleCloseTaskDetail}
+        />
+      )}
 
       <section style={styles.section}>
         <div style={styles.sectionGrid}>

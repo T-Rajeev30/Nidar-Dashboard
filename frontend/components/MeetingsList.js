@@ -19,11 +19,6 @@ export default function MeetingsList({ meetings }) {
             {new Date(m.scheduledAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
           </p>
           {m.agenda && <p style={styles.agenda}>{m.agenda}</p>}
-          {m.meetLink && (
-            <a href={m.meetLink} target="_blank" rel="noreferrer" style={styles.meetLink}>
-              Join meeting →
-            </a>
-          )}
           <p style={styles.attendees}>
             {m.invitees.map((i) => i.name).join(', ')}
           </p>
@@ -43,7 +38,6 @@ const styles = {
   badgeFailed: { background: 'rgba(229,72,77,0.15)', color: 'var(--status-blocked)' },
   when: { margin: '4px 0', fontSize: 12, color: 'var(--signal)', fontFamily: 'var(--font-mono)' },
   agenda: { margin: '4px 0', fontSize: 13, color: 'var(--text-muted)' },
-  meetLink: { display: 'block', margin: '4px 0', fontSize: 12, color: 'var(--signal)', textDecoration: 'none' },
   attendees: { margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' },
   empty: { color: 'var(--text-muted)', fontSize: 13 },
 };
