@@ -12,7 +12,7 @@ async function seedTeams() {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
   }
-  console.log('[seed] teams ready: core-technical, design-cad, social');
+  console.log('[seed] teams ready: core-technical, design-cad, social, documentation');
 }
 
 module.exports = { seedTeams };
