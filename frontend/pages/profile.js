@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { api } from '../lib/api';
-import { getMember, saveMember } from '../lib/session';
 import TaskItem from '../components/TaskItem';
 import TaskDetailModal from '../components/TaskDetailModal';
 
@@ -31,15 +30,13 @@ export default function Profile() {
   }, []);
 
   useEffect(() => {
-    const m = getMember();
-    if (!m) {
-      router.replace('/');
-      return;
-    }
-    setMember(m);
-    setEmail(m.email || '');
-    setRole(m.role || '');
-    loadTasks(m).finally(() => setLoading(false));
+    api.getCurrentMember().then((data) => {
+      const m = data.member || data;
+      setMember(m);
+      setEmail(m.email || '');
+      setRole(m.role || '');
+      return loadTasks(m);
+    }).catch(() => router.replace('/')).finally(() => setLoading(false));
   }, [router, loadTasks]);
 
   async function handleSave(e) {
@@ -50,7 +47,6 @@ export default function Profile() {
       const updated = await api.updateMember(member._id, { email: email.trim(), role: role.trim() });
       const merged = { ...member, email: updated.email, role: updated.role };
       setMember(merged);
-      saveMember(merged);
       setSaveStatus({ ok: true, message: 'Profile updated.' });
     } catch (err) {
       setSaveStatus({ ok: false, message: err.message });

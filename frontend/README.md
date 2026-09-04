@@ -15,13 +15,11 @@ Visit http://localhost:3000.
 
 ## How sign-in works
 
-There are no passwords. Type your name:
-- If a member with that name already exists, you're signed in.
-- If not, you're asked to pick a team (Core Technical / Design & CAD / Social / Documentation) and join.
+Members sign in with the email address and password established through a one-time administrator invitation. New members use the **Claim your invite** link to review their assigned team and set a password. Invitation tokens are never stored in browser storage and expire after one use.
 
-Your identity is stored in `localStorage` on this device only.
+The API issues an opaque, expiring HttpOnly session cookie. `lib/api.js` sends it with `credentials: include`; the browser never stores a session token or treats a local identity as authority. Existing `nidar_member` localStorage values are removed as a migration courtesy.
 
-This is convenient member access for a trusted internal board, not password authentication or authorization.
+Administrators can manage invitations, team/role/status changes, access resets, and session revocation at `/admin/members`. If SMTP is unavailable, the one-time claim link is shown once so it can be copied and delivered securely by an administrator.
 
 ## Checks
 
@@ -42,8 +40,10 @@ Once deployed, go back to your Render backend's `CORS_ORIGIN` env var and set it
 
 ## Structure
 
-- `pages/index.js` — sign-in / join-a-team screen
+- `pages/index.js` — email/password sign-in screen
+- `pages/claim-invite.js` — one-time invitation claim and password setup
+- `pages/admin/members.js` — small-team administrator member management
 - `pages/dashboard.js` — the ops board (four team columns, task filters, plans, and meetings)
 - `components/` — one file per UI piece (Header, TeamColumn, TaskItem, AddTaskForm, ProgressBar)
 - `lib/api.js` — the only place that talks to the backend
-- `lib/session.js` — localStorage helpers for the signed-in member
+- `lib/session.js` — legacy localStorage migration shim; server sessions are authoritative

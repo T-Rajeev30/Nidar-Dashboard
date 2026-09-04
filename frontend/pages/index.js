@@ -1,53 +1,30 @@
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { api, ApiError } from '../lib/api';
-import { saveMember } from '../lib/session';
-
-const TEAM_OPTIONS = [
-  { key: 'core-technical', displayName: 'Core Technical' },
-  { key: 'design-cad', displayName: 'Design & CAD' },
-  { key: 'social', displayName: 'Social' },
-  { key: 'documentation', displayName: 'Documentation' },
-];
 
 export default function SignIn() {
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [stage, setStage] = useState('name');
-  const [teamKey, setTeamKey] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  async function handleContinue(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    if (!name.trim()) return;
+    if (!email.trim() || !password) return;
     setError('');
     setLoading(true);
     try {
-      const { member } = await api.login(name.trim());
-      saveMember(member);
-      router.push('/dashboard');
+      await api.login(email.trim(), password);
+      await router.push('/dashboard');
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) setStage('pick-team');
-      else setError(err.message || 'Unable to check your member access. Try again.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleJoin(event) {
-    event.preventDefault();
-    if (!teamKey) return setError('Choose a team to continue.');
-    setError('');
-    setLoading(true);
-    try {
-      const { member } = await api.join(name.trim(), email.trim(), teamKey, role.trim());
-      saveMember(member);
-      router.push('/dashboard');
-    } catch (err) {
-      setError(err.message || 'Unable to join the board. Try again.');
+      if (err instanceof ApiError && err.status === 0) {
+        setError('The board is unavailable right now. Check your connection and try again.');
+      } else {
+        setError('Email or password is incorrect. If you were invited, use the link in your invitation.');
+      }
     } finally {
       setLoading(false);
     }
@@ -59,29 +36,18 @@ export default function SignIn() {
         <p className="eyebrow"><span aria-hidden="true" />GPS-DENIED · GRID 00,00</p>
         <h1 id="signin-title">AirMouse Ops Board</h1>
         <p className="lede">NIDAR 2026–27 · Track 1 mission dashboard</p>
-        {stage === 'name' ? (
-          <form className="stack-form" onSubmit={handleContinue}>
-            <label htmlFor="name">Your name</label>
-            <input id="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Rajeev" autoComplete="name" autoFocus required />
-            <button className="button button-primary" disabled={loading || !name.trim()}>{loading ? 'Checking member access…' : 'Continue'}</button>
-          </form>
-        ) : (
-          <form className="stack-form" onSubmit={handleJoin}>
-            <p className="form-hint">No member named <strong>{name}</strong> yet. Add your details to join the board.</p>
-            <label htmlFor="email">Email</label>
-            <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" required />
-            <label htmlFor="team">Team</label>
-            <select id="team" value={teamKey} onChange={(event) => setTeamKey(event.target.value)} required>
-              <option value="">Choose your team</option>
-              {TEAM_OPTIONS.map((team) => <option key={team.key} value={team.key}>{team.displayName}</option>)}
-            </select>
-            <label htmlFor="role">Role <span className="muted">(optional)</span></label>
-            <input id="role" value={role} onChange={(event) => setRole(event.target.value)} placeholder="e.g. Frame lead or SLAM" autoComplete="organization-title" />
-            <button className="button button-primary" disabled={loading}>{loading ? 'Joining…' : 'Join board'}</button>
-            <button className="button button-quiet" type="button" onClick={() => { setStage('name'); setError(''); }}>Use a different name</button>
-          </form>
-        )}
-        <p className="form-message" role="status" aria-live="polite">{error}</p>
+        <form className="stack-form" onSubmit={handleSubmit} noValidate>
+          <label htmlFor="email">Email</label>
+          <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" autoCapitalize="none" autoFocus required />
+          <label htmlFor="password">Password</label>
+          <div className="password-field">
+            <input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
+            <button type="button" className="password-toggle" onClick={() => setShowPassword((visible) => !visible)} aria-pressed={showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? 'Hide' : 'Show'}</button>
+          </div>
+          <button className="button button-primary" disabled={loading || !email.trim() || !password}>{loading ? 'Signing in…' : 'Sign in'}</button>
+        </form>
+        <p className="form-message" role="alert" aria-live="polite">{error}</p>
+        <p className="form-hint invite-help">Have an invitation? <Link href="/claim-invite">Claim your invite</Link></p>
       </section>
     </main>
   );

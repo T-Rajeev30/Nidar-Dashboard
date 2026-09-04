@@ -10,6 +10,7 @@ export default function Document() {
           rel="stylesheet"
         />
         <meta name="description" content="Mission dashboard for the NIDAR AirMouse challenge" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       </Head>
       <body>
         <Main />

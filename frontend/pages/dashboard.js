@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { api } from '../lib/api';
-import { getMember, clearMember } from '../lib/session';
+import { api, ApiError } from '../lib/api';
+import { clearMember } from '../lib/session';
 import { filterTasks } from '../lib/dashboard-utils.mjs';
 import Header from '../components/Header';
 import TeamColumn from '../components/TeamColumn';
@@ -26,6 +26,11 @@ export default function Dashboard() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
 
+  const redirectToSignIn = useCallback(() => {
+    clearMember();
+    router.replace('/');
+  }, [router]);
+
   const loadAll = useCallback(async ({ refresh = false } = {}) => {
     refresh ? setRefreshing(true) : setLoading(true);
     setError('');
@@ -42,28 +47,56 @@ export default function Dashboard() {
       setPlans(plansData);
       return byTeam;
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        redirectToSignIn();
+        return;
+      }
       setError(err.message || 'Unable to load the mission board. Try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [redirectToSignIn]);
 
   useEffect(() => {
-    const saved = getMember();
-    if (!saved) { router.replace('/'); return; }
-    setMember(saved);
-    loadAll();
-  }, [loadAll, router]);
+    let active = true;
+    async function bootstrap() {
+      // Remove the pre-session identity cache during migration. The server
+      // cookie remains the only authority for this page.
+      clearMember();
+      setLoading(true);
+      setError('');
+      try {
+        const current = await api.getCurrentMember();
+        if (!active) return;
+        setMember(current.member || current);
+        await loadAll();
+      } catch (err) {
+        if (!active) return;
+        if (err instanceof ApiError && err.status === 401) {
+          redirectToSignIn();
+        } else {
+          setError(err.message || 'Unable to load the mission board. Try again.');
+          setLoading(false);
+        }
+      }
+    }
+    bootstrap();
+    return () => { active = false; };
+  }, [loadAll, redirectToSignIn]);
 
   async function mutate(action, successMessage) {
     setFeedback('');
     try {
-      await action();
+      const result = await action();
       await loadAll({ refresh: true });
-      setFeedback(successMessage);
+      setFeedback(typeof successMessage === 'function' ? successMessage(result) : successMessage);
       return true;
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        redirectToSignIn();
+        return false;
+      }
       setError(err.message || 'That change could not be saved. Try again.');
       return false;
     }
@@ -85,11 +118,27 @@ export default function Dashboard() {
     return { total: all.length, done, percent: all.length ? Math.round((done / all.length) * 100) : 0 };
   }, [tasksByTeam]);
 
+  const handleSignOut = useCallback(async () => {
+    try {
+      await api.logout();
+    } catch (err) {
+      // A revoked/expired session is already signed out. Other failures are
+      // still surfaced before leaving the page so the user understands what
+      // happened, while the local migration key is always removed.
+      if (!(err instanceof ApiError && err.status === 401)) {
+        setError(err.message || 'Unable to sign out cleanly. Try again.');
+      }
+    } finally {
+      clearMember();
+      router.replace('/');
+    }
+  }, [router]);
+
   if (loading) return <main className="loading-page" aria-busy="true"><div className="loading-card"><span className="skeleton-line" /><span className="skeleton-line short" /><span className="skeleton-grid" /></div><p>Loading mission board…</p></main>;
 
   return (
     <div className="app-shell">
-      <Header member={member} overallProgress={overallProgress} deadline={deadline} onSignOut={() => { clearMember(); router.replace('/'); }} />
+      <Header member={member} overallProgress={overallProgress} deadline={deadline} onSignOut={handleSignOut} />
       <main className="dashboard-main">
         <div className="page-intro">
           <div><p className="eyebrow">OPERATIONS</p><h2>Team workboard</h2><p className="muted">Track work, unblock teammates, and keep the mission moving.</p></div>
@@ -100,13 +149,13 @@ export default function Dashboard() {
         <section className="team-grid" aria-label="Team tasks">
           {teams.map((team) => <TeamColumn key={team._id} team={team} tasks={filterTasks(tasksByTeam[team._id] || [], { query, status })}
             filtered={Boolean(query || status !== 'all')}
-            onAddTask={(teamId, payload) => mutate(() => api.createTask({ ...payload, team: teamId, createdBy: member._id }), 'Task added.')}
+            onAddTask={(teamId, payload) => mutate(() => api.createTask({ ...payload, team: teamId }), 'Task added.')}
             onUpdateTask={(taskId, updates) => mutate(() => api.updateTask(taskId, updates), 'Task updated.')}
             onDeleteTask={(taskId) => mutate(() => api.deleteTask(taskId), 'Task deleted.')}
             onSeedModules={handleSeedModules} />)}
         </section>
-        <section className="dashboard-section" aria-labelledby="plans-heading"><div className="section-heading"><div><p className="eyebrow">ACCOUNTABILITY</p><h2 id="plans-heading">Plans and progress</h2></div></div><div className="detail-grid"><div className="surface"><h3>Post a team plan</h3><PlanUpload teams={teams} defaultTeamId={member?.team?._id} onUpload={(payload) => mutate(() => api.createPlan({ ...payload, createdBy: member._id }), 'Plan posted.')} /></div><div className="surface"><h3>Recent plans</h3><PlansList plans={plans} onDelete={(id) => mutate(() => api.deletePlan(id), 'Plan deleted.')} /></div></div></section>
-        <section className="dashboard-section" aria-labelledby="meetings-heading"><div className="section-heading"><div><p className="eyebrow">COORDINATION</p><h2 id="meetings-heading">Meetings</h2></div></div><div className="detail-grid"><div className="surface"><h3>Schedule a meeting</h3><MeetingScheduler teams={teams} onSchedule={async (payload) => { const meeting = await api.createMeeting({ ...payload, organizerId: member._id }); await loadAll({ refresh: true }); return meeting; }} /></div><div className="surface"><h3>Schedule</h3><MeetingsList meetings={meetings} /></div></div></section>
+        <section className="dashboard-section" aria-labelledby="plans-heading"><div className="section-heading"><div><p className="eyebrow">ACCOUNTABILITY</p><h2 id="plans-heading">Plans and progress</h2></div></div><div className="detail-grid"><div className="surface"><h3>Post a team plan</h3><PlanUpload teams={teams} defaultTeamId={member?.team?._id} onUpload={(payload) => mutate(() => api.createPlan(payload), 'Plan posted.')} /></div><div className="surface"><h3>Recent plans</h3><PlansList plans={plans} onDelete={(id) => mutate(() => api.deletePlan(id), 'Plan deleted.')} /></div></div></section>
+        <section className="dashboard-section" aria-labelledby="meetings-heading"><div className="section-heading"><div><p className="eyebrow">COORDINATION</p><h2 id="meetings-heading">Meetings</h2></div></div><div className="detail-grid"><div className="surface"><h3>Schedule a meeting</h3><MeetingScheduler teams={teams} onSchedule={async (payload) => { const meeting = await api.createMeeting(payload); await loadAll({ refresh: true }); return meeting; }} /></div><div className="surface"><h3>Schedule</h3><MeetingsList meetings={meetings} onRetry={(id) => mutate(() => api.retryMeeting(id), (meeting) => meeting?.emailStatus === 'sent' ? 'Invitation sent.' : 'Meeting is saved, but invitation delivery is still failing. Try again later.')} /></div></div></section>
       </main>
     </div>
   );

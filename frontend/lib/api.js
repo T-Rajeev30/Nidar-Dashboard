@@ -14,9 +14,11 @@ export class ApiError extends Error {
 async function request(path, options = {}) {
   let res;
   try {
+    const { headers = {}, ...requestOptions } = options;
     res = await fetch(`${API_URL}/api${path}`, {
-      headers: { 'Content-Type': 'application/json' },
-      ...options,
+      ...requestOptions,
+      headers: { 'Content-Type': 'application/json', ...headers },
+      credentials: 'include',
     });
   } catch {
     throw new ApiError('Cannot reach the mission board. Check your connection and try again.', 0, 'NETWORK_ERROR');
@@ -26,15 +28,22 @@ async function request(path, options = {}) {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new ApiError(data.error || `Request failed (${res.status})`, res.status, data.code);
+    const error = data.error;
+    const message = typeof error === 'string'
+      ? error
+      : error?.message || data.message || `Request failed (${res.status})`;
+    const code = data.code || (typeof error === 'object' ? error?.code : undefined);
+    throw new ApiError(message, res.status, code);
   }
   return data;
 }
 
 export const api = {
-  login: (name) => request('/auth/login', { method: 'POST', body: JSON.stringify({ name }) }),
-  join: (name, email, teamKey, role) =>
-    request('/auth/join', { method: 'POST', body: JSON.stringify({ name, email, teamKey, role }) }),
+  login: (email, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  getCurrentMember: () => request('/auth/me'),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  getInvite: (token) => request(`/auth/invite/${encodeURIComponent(token)}`),
+  claimInvite: (token, password) => request('/auth/claim-invite', { method: 'POST', body: JSON.stringify({ token, password }) }),
   getTeams: () => request('/teams'),
   getTasks: (teamId) => request(`/tasks${teamId ? `?team=${teamId}` : ''}`),
   createTask: (payload) => request('/tasks', { method: 'POST', body: JSON.stringify(payload) }),
@@ -49,8 +58,14 @@ export const api = {
   getTasksForMember: (memberId) => request(`/tasks?assignee=${memberId}`),
   getMeetings: () => request('/meetings'),
   createMeeting: (payload) => request('/meetings', { method: 'POST', body: JSON.stringify(payload) }),
+  retryMeeting: (id) => request(`/meetings/${id}/notifications/retry`, { method: 'POST' }),
   getPlans: () => request('/plans'),
   getPlanPhases: () => request('/plans/phases'),
   createPlan: (payload) => request('/plans', { method: 'POST', body: JSON.stringify(payload) }),
   deletePlan: (id) => request(`/plans/${id}`, { method: 'DELETE' }),
+  getAdminMembers: () => request('/admin/members'),
+  createInvite: (payload) => request('/admin/invites', { method: 'POST', body: JSON.stringify(payload) }),
+  resetMemberAccess: (id) => request(`/admin/members/${encodeURIComponent(id)}/reset-access`, { method: 'POST' }),
+  updateMember: (id, payload) => request(`/admin/members/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  revokeMemberSessions: (id) => request(`/admin/members/${encodeURIComponent(id)}/revoke-sessions`, { method: 'POST' }),
 };
