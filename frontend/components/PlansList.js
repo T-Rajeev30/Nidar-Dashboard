@@ -7,6 +7,7 @@ const PHASE_LABELS = {
   final: 'Final',
 };
 import { safeExternalUrl } from '../lib/dashboard-utils.mjs';
+import { Button } from './ui/button';
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-IN', {
@@ -16,7 +17,7 @@ function formatDate(dateStr) {
 
 export default function PlansList({ plans, onDelete }) {
   if (plans.length === 0) {
-    return <p style={styles.empty}>No plans uploaded yet.</p>;
+    return <div className="empty-state-action"><p style={styles.empty}>No plans have been posted yet. Share the next team milestone to keep progress visible.</p><Button asChild size="sm"><a href="#post-plan">Post a plan</a></Button></div>;
   }
 
   return (

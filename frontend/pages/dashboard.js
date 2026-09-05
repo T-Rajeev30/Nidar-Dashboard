@@ -17,6 +17,7 @@ import AddTaskForm from '../components/AddTaskForm';
 import TasksDataTable from '../components/tasks/TasksDataTable';
 import TaskDetailSheet from '../components/tasks/TaskDetailSheet';
 import { createDashboardMetrics } from '../lib/dashboard-metrics.mjs';
+import { applyTaskUpdate } from '../lib/task-state.mjs';
 
 const DashboardMetrics = dynamic(() => import('../components/DashboardMetrics'), { ssr: false });
 
@@ -34,6 +35,7 @@ export default function Dashboard() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [selectedTask, setSelectedTask] = useState(null);
+  const [updatingTaskId, setUpdatingTaskId] = useState('');
 
   const redirectToSignIn = useCallback(() => {
     clearMember();
@@ -120,6 +122,28 @@ export default function Dashboard() {
     return result;
   }
 
+  async function updateTaskOptimistically(taskId, updates) {
+    const previousTasks = tasksByTeam;
+    setTasksByTeam(applyTaskUpdate(previousTasks, taskId, updates, teams));
+    setUpdatingTaskId(taskId);
+    try {
+      await api.updateTask(taskId, updates);
+      await loadAll({ refresh: true });
+      toast.success('Task updated.');
+      return true;
+    } catch (err) {
+      setTasksByTeam(previousTasks);
+      if (err instanceof ApiError && err.status === 401) {
+        redirectToSignIn();
+      } else {
+        toast.error(err.message || 'That change could not be saved. Your task was restored.');
+      }
+      return false;
+    } finally {
+      setUpdatingTaskId('');
+    }
+  }
+
   const allTasks = useMemo(() => Object.values(tasksByTeam).flat(), [tasksByTeam]);
 
   const overallProgress = useMemo(() => {
@@ -157,10 +181,10 @@ export default function Dashboard() {
         </div>
         <DashboardMetrics metrics={metrics} />
         {error && <div className="notice notice-error" role="alert"><span>{error}</span><Button variant="outline" onClick={() => loadAll({ refresh: true })}>Retry</Button></div>}
-        <section aria-label="Team tasks"><TasksDataTable tasks={visibleTasks} teams={teams} onTaskClick={setSelectedTask} /><div className="task-create-grid" aria-label="Add a task by team">{teams.map((team) => <div key={team._id}><h3>{team.displayName}</h3><AddTaskForm onAdd={(payload) => mutate(() => api.createTask({ ...payload, team: team._id }), 'Task added.')} /></div>)}</div></section>
-        <section className="dashboard-section" aria-labelledby="plans-heading"><div className="section-heading"><div><p className="eyebrow">ACCOUNTABILITY</p><h2 id="plans-heading">Plans and progress</h2></div></div><div className="detail-grid"><Card className="surface"><h3>Post a team plan</h3><PlanUpload teams={teams} defaultTeamId={member?.team?._id} onUpload={(payload) => mutate(() => api.createPlan(payload), 'Plan posted.')} /></Card><Card className="surface"><h3>Recent plans</h3><PlansList plans={plans} onDelete={(id) => mutate(() => api.deletePlan(id), 'Plan deleted.')} /></Card></div></section>
-        <section className="dashboard-section" aria-labelledby="meetings-heading"><div className="section-heading"><div><p className="eyebrow">COORDINATION</p><h2 id="meetings-heading">Meetings</h2></div></div><div className="detail-grid"><Card className="surface"><h3>Schedule a meeting</h3><MeetingScheduler teams={teams} onSchedule={async (payload) => { const meeting = await api.createMeeting(payload); await loadAll({ refresh: true }); return meeting; }} /></Card><Card className="surface"><h3>Schedule</h3><MeetingsList meetings={meetings} onRetry={(id) => mutate(() => api.retryMeeting(id), (meeting) => meeting?.emailStatus === 'sent' ? 'Invitation sent.' : 'Meeting is saved, but invitation delivery is still failing. Try again later.')} /></Card></div></section>
-        <TaskDetailSheet task={selectedTask} team={teams.find((team) => team._id === (selectedTask?.team?._id || selectedTask?.team))} onClose={() => setSelectedTask(null)} onSave={(taskId, updates) => mutate(() => api.updateTask(taskId, updates), 'Task updated.')} onDelete={(taskId) => mutate(() => api.deleteTask(taskId), 'Task deleted.')} />
+        <section aria-label="Team tasks"><TasksDataTable tasks={visibleTasks} teams={teams} onTaskClick={setSelectedTask} onStatusChange={updateTaskOptimistically} updatingTaskId={updatingTaskId} emptyAction={query || status !== 'all' ? <Button variant="outline" onClick={() => { setQuery(''); setStatus('all'); }}>Clear filters</Button> : <Button asChild><a href="#create-task">Create task</a></Button>} /><div className="task-create-grid" id="create-task" aria-label="Add a task by team">{teams.map((team) => <div key={team._id}><h3>{team.displayName}</h3><AddTaskForm onAdd={(payload) => mutate(() => api.createTask({ ...payload, team: team._id }), 'Task added.')} /></div>)}</div></section>
+        <section className="dashboard-section" aria-labelledby="plans-heading"><div className="section-heading"><div><p className="eyebrow">ACCOUNTABILITY</p><h2 id="plans-heading">Plans and progress</h2></div></div><div className="detail-grid"><Card className="surface" id="post-plan"><h3>Post a team plan</h3><PlanUpload teams={teams} defaultTeamId={member?.team?._id} onUpload={(payload) => mutate(() => api.createPlan(payload), 'Plan posted.')} /></Card><Card className="surface"><h3>Recent plans</h3><PlansList plans={plans} onDelete={(id) => mutate(() => api.deletePlan(id), 'Plan deleted.')} /></Card></div></section>
+        <section className="dashboard-section" aria-labelledby="meetings-heading"><div className="section-heading"><div><p className="eyebrow">COORDINATION</p><h2 id="meetings-heading">Meetings</h2></div></div><div className="detail-grid"><Card className="surface" id="schedule-meeting"><h3>Schedule a meeting</h3><MeetingScheduler teams={teams} onSchedule={async (payload) => { const meeting = await api.createMeeting(payload); await loadAll({ refresh: true }); return meeting; }} /></Card><Card className="surface"><h3>Schedule</h3><MeetingsList meetings={meetings} onRetry={(id) => mutate(() => api.retryMeeting(id), (meeting) => meeting?.emailStatus === 'sent' ? 'Invitation sent.' : 'Meeting is saved, but invitation delivery is still failing. Try again later.')} /></Card></div></section>
+        <TaskDetailSheet task={selectedTask} team={teams.find((team) => team._id === (selectedTask?.team?._id || selectedTask?.team))} onClose={() => setSelectedTask(null)} onSave={updateTaskOptimistically} onDelete={(taskId) => mutate(() => api.deleteTask(taskId), 'Task deleted.')} />
       </main>
     </div>
   );

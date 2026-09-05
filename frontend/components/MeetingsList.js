@@ -2,11 +2,12 @@
 // email-send status.
 import { useState } from 'react';
 import { safeExternalUrl } from '../lib/dashboard-utils.mjs';
+import { Button } from './ui/button';
 export default function MeetingsList({ meetings, onRetry }) {
   const [retryingId, setRetryingId] = useState(null);
 
   if (meetings.length === 0) {
-    return <p style={styles.empty}>No meetings scheduled yet.</p>;
+    return <div className="empty-state-action"><p style={styles.empty}>No meetings are scheduled yet. Set the next coordination point for the team.</p><Button asChild size="sm"><a href="#schedule-meeting">Schedule a meeting</a></Button></div>;
   }
 
   return (

@@ -30,7 +30,7 @@ const tableFeaturesConfig = tableFeatures({
   columnVisibilityFeature,
 });
 
-export default function DataTable({ columns, data, searchPlaceholder = 'Filter rows…', onRowClick, emptyMessage = 'No matching records.' }) {
+export default function DataTable({ columns, data, searchPlaceholder = 'Filter rows…', onRowClick, emptyMessage = 'No matching records.', emptyAction }) {
   const stableData = useMemo(() => data || [], [data]);
   const table = useTable({
     features: tableFeaturesConfig,
@@ -76,7 +76,7 @@ export default function DataTable({ columns, data, searchPlaceholder = 'Filter r
           <TableBody>
             {rows.length ? rows.map((row) => <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'} className={onRowClick ? 'data-table-row-clickable' : ''} onClick={(event) => { if (!event.target.closest('button,input,a,select')) onRowClick?.(row.original); }}>
               {row.getVisibleCells().map((cell) => <TableCell key={cell.id}><table.FlexRender cell={cell} /></TableCell>)}
-            </TableRow>) : <TableRow><TableCell colSpan={table.getVisibleLeafColumns().length} className="h-24 text-center text-muted-foreground">{emptyMessage}</TableCell></TableRow>}
+            </TableRow>) : <TableRow><TableCell colSpan={table.getVisibleLeafColumns().length} className="h-32 text-center text-muted-foreground"><p>{emptyMessage}</p><div className="mt-3">{table.state.globalFilter ? <Button variant="outline" size="sm" onClick={() => table.setGlobalFilter('')}>Clear table search</Button> : emptyAction}</div></TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
