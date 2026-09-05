@@ -74,7 +74,7 @@ export default function DataTable({ columns, data, searchPlaceholder = 'Filter r
             </TableRow>)}
           </TableHeader>
           <TableBody>
-            {rows.length ? rows.map((row) => <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'} className={onRowClick ? 'data-table-row-clickable' : ''} onClick={(event) => { if (!event.target.closest('button,input,a,select')) onRowClick?.(row.original); }}>
+            {rows.length ? rows.map((row, index) => <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'} style={{ '--row-index': index }} className={`${onRowClick ? 'data-table-row-clickable ' : ''}data-table-row-animated`} onClick={(event) => { if (!event.target.closest('button,input,a,select')) onRowClick?.(row.original); }}>
               {row.getVisibleCells().map((cell) => <TableCell key={cell.id} data-label={typeof cell.column.columnDef.header === 'string' ? cell.column.columnDef.header : cell.column.id}><table.FlexRender cell={cell} /></TableCell>)}
             </TableRow>) : <TableRow><TableCell colSpan={table.getVisibleLeafColumns().length} className="data-table-empty-cell h-32 text-center text-muted-foreground"><p>{emptyMessage}</p><div className="mt-3">{table.state.globalFilter ? <Button variant="outline" size="sm" onClick={() => table.setGlobalFilter('')}>Clear table search</Button> : emptyAction}</div></TableCell></TableRow>}
           </TableBody>

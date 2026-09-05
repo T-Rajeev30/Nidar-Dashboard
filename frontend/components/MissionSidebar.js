@@ -1,10 +1,10 @@
-import Link from 'next/link';
+import TransitionLink from './TransitionLink';
 import { Home, Menu, ShieldCheck } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet';
 
 function Navigation({ isAdmin, onNavigate }) {
-  return <nav className="mission-nav" aria-label="Primary navigation"><Link href="/dashboard" onClick={onNavigate}><Home aria-hidden="true" /><span>Dashboard</span></Link>{isAdmin && <Link href="/admin/members" onClick={onNavigate}><ShieldCheck aria-hidden="true" /><span>Members</span></Link>}</nav>;
+  return <nav className="mission-nav" aria-label="Primary navigation"><TransitionLink href="/dashboard" onClick={onNavigate}><Home aria-hidden="true" /><span>Dashboard</span></TransitionLink>{isAdmin && <TransitionLink href="/admin/members" onClick={onNavigate}><ShieldCheck aria-hidden="true" /><span>Members</span></TransitionLink>}</nav>;
 }
 
 export function MobileNavigationButton({ onClick }) {
