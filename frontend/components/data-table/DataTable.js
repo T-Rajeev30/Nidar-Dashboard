@@ -68,7 +68,7 @@ export default function DataTable({ columns, data, searchPlaceholder = 'Filter r
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => <TableHead key={header.id}>
+              {headerGroup.headers.map((header) => <TableHead key={header.id} scope="col">
                 {header.isPlaceholder ? null : header.column.getCanSort() ? <Button variant="ghost" size="sm" onClick={header.column.getToggleSortingHandler()}>{<table.FlexRender header={header} />}{header.column.getIsSorted() === 'asc' ? <ChevronUp /> : header.column.getIsSorted() === 'desc' ? <ChevronDown /> : null}</Button> : <table.FlexRender header={header} />}
               </TableHead>)}
             </TableRow>)}
@@ -76,7 +76,7 @@ export default function DataTable({ columns, data, searchPlaceholder = 'Filter r
           <TableBody>
             {rows.length ? rows.map((row) => <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'} className={onRowClick ? 'data-table-row-clickable' : ''} onClick={(event) => { if (!event.target.closest('button,input,a,select')) onRowClick?.(row.original); }}>
               {row.getVisibleCells().map((cell) => <TableCell key={cell.id} data-label={typeof cell.column.columnDef.header === 'string' ? cell.column.columnDef.header : cell.column.id}><table.FlexRender cell={cell} /></TableCell>)}
-            </TableRow>) : <TableRow><TableCell colSpan={table.getVisibleLeafColumns().length} className="h-32 text-center text-muted-foreground"><p>{emptyMessage}</p><div className="mt-3">{table.state.globalFilter ? <Button variant="outline" size="sm" onClick={() => table.setGlobalFilter('')}>Clear table search</Button> : emptyAction}</div></TableCell></TableRow>}
+            </TableRow>) : <TableRow><TableCell colSpan={table.getVisibleLeafColumns().length} className="data-table-empty-cell h-32 text-center text-muted-foreground"><p>{emptyMessage}</p><div className="mt-3">{table.state.globalFilter ? <Button variant="outline" size="sm" onClick={() => table.setGlobalFilter('')}>Clear table search</Button> : emptyAction}</div></TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>

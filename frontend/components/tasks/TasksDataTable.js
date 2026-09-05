@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
 import DataTable from '../data-table/DataTable';
 
 const STATUS_LABELS = {
@@ -26,13 +27,13 @@ export default function TasksDataTable({ tasks, teams, onTaskClick, onStatusChan
       enableSorting: false,
       enableHiding: false,
     },
-    { accessorKey: 'title', header: 'Task', cell: ({ row }) => <div><strong>{row.original.title}</strong>{row.original.description && <p className="data-table-description">{row.original.description}</p>}</div> },
+    { accessorKey: 'title', header: 'Task', cell: ({ row }) => <div><strong>{row.original.title}</strong>{row.original.description && <p className="data-table-description">{row.original.description}</p>}{onTaskClick && <Button variant="ghost" size="sm" className="mt-1" onClick={(event) => { event.stopPropagation(); onTaskClick(row.original); }}>Edit task</Button>}</div> },
     { accessorKey: 'teamName', header: 'Team' },
     { accessorKey: 'status', header: 'Status', cell: ({ row }) => onStatusChange ? <select aria-label={`Status for ${row.original.title}`} value={row.original.status} disabled={updatingTaskId === row.original._id} onClick={(event) => event.stopPropagation()} onChange={(event) => onStatusChange(row.original._id, { status: event.target.value })}>{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select> : <Badge variant={statusVariant(row.original.status)}>{STATUS_LABELS[row.original.status] || row.original.status}</Badge> },
     { id: 'assignee', header: 'Assignee', accessorFn: (row) => row.assignee?.name || 'Unassigned', cell: ({ getValue }) => getValue() },
     { id: 'subProblemRef', header: 'Sub-problem', accessorFn: (row) => row.subProblemRef || 0, cell: ({ getValue }) => getValue() ? `SP-${String(getValue()).padStart(2, '0')}` : '—' },
     { id: 'dueDate', header: 'Due date', accessorFn: (row) => row.dueDate || '', cell: ({ getValue }) => getValue() ? new Date(getValue()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—' },
-  ], [onStatusChange, updatingTaskId]);
+  ], [onStatusChange, onTaskClick, updatingTaskId]);
 
   return <TasksDataTableView columns={columns} rows={rows} onTaskClick={onTaskClick} emptyAction={emptyAction} />;
 }
