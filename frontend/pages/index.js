@@ -2,6 +2,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { api, ApiError } from '../lib/api';
+import { Eye, EyeOff, LogIn } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 
 export default function SignIn() {
   const router = useRouter();
@@ -32,23 +37,27 @@ export default function SignIn() {
 
   return (
     <main className="signin-shell">
-      <section className="signin-panel" aria-labelledby="signin-title">
-        <p className="eyebrow"><span aria-hidden="true" />GPS-DENIED · GRID 00,00</p>
-        <h1 id="signin-title">AirMouse Ops Board</h1>
-        <p className="lede">NIDAR 2026–27 · Track 1 mission dashboard</p>
-        <form className="stack-form" onSubmit={handleSubmit} noValidate>
-          <label htmlFor="email">Email</label>
-          <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" autoCapitalize="none" autoFocus required />
-          <label htmlFor="password">Password</label>
+      <Card className="signin-panel border-border bg-card text-card-foreground" aria-labelledby="signin-title">
+        <CardHeader className="px-0 pt-0">
+          <p className="eyebrow"><span aria-hidden="true" />GPS-DENIED · GRID 00,00</p>
+          <CardTitle id="signin-title" className="text-2xl">AirMouse Ops Board</CardTitle>
+          <CardDescription className="lede">NIDAR 2026–27 · Track 1 mission dashboard</CardDescription>
+        </CardHeader>
+        <CardContent className="px-0 pb-0">
+          <form className="stack-form" onSubmit={handleSubmit} noValidate>
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" autoCapitalize="none" autoFocus required />
+          <Label htmlFor="password">Password</Label>
           <div className="password-field">
-            <input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
-            <button type="button" className="password-toggle" onClick={() => setShowPassword((visible) => !visible)} aria-pressed={showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? 'Hide' : 'Show'}</button>
+            <Input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
+            <Button type="button" className="password-toggle" variant="ghost" size="icon" onClick={() => setShowPassword((visible) => !visible)} aria-pressed={showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff /> : <Eye />}</Button>
           </div>
-          <button className="button button-primary" disabled={loading || !email.trim() || !password}>{loading ? 'Signing in…' : 'Sign in'}</button>
+          <Button className="mt-2 min-h-11" size="lg" disabled={loading || !email.trim() || !password}>{loading ? 'Signing in…' : <><LogIn />Sign in</>}</Button>
         </form>
         <p className="form-message" role="alert" aria-live="polite">{error}</p>
         <p className="form-hint invite-help">Have an invitation? <Link href="/claim-invite">Claim your invite</Link></p>
-      </section>
+        </CardContent>
+      </Card>
     </main>
   );
 }

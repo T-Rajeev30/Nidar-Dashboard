@@ -10,6 +10,9 @@ import MeetingScheduler from '../components/MeetingScheduler';
 import MeetingsList from '../components/MeetingsList';
 import PlanUpload from '../components/PlanUpload';
 import PlansList from '../components/PlansList';
+import { toast } from 'sonner';
+import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -22,7 +25,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [feedback, setFeedback] = useState('');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
 
@@ -86,18 +88,17 @@ export default function Dashboard() {
   }, [loadAll, redirectToSignIn]);
 
   async function mutate(action, successMessage) {
-    setFeedback('');
     try {
       const result = await action();
       await loadAll({ refresh: true });
-      setFeedback(typeof successMessage === 'function' ? successMessage(result) : successMessage);
+      toast.success(typeof successMessage === 'function' ? successMessage(result) : successMessage);
       return true;
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         redirectToSignIn();
         return false;
       }
-      setError(err.message || 'That change could not be saved. Try again.');
+      toast.error(err.message || 'That change could not be saved. Try again.');
       return false;
     }
   }
@@ -144,8 +145,7 @@ export default function Dashboard() {
           <div><p className="eyebrow">OPERATIONS</p><h2>Team workboard</h2><p className="muted">Track work, unblock teammates, and keep the mission moving.</p></div>
           <TaskToolbar query={query} status={status} onQueryChange={setQuery} onStatusChange={setStatus} onRefresh={() => loadAll({ refresh: true })} refreshing={refreshing} />
         </div>
-        {error && <div className="notice notice-error" role="alert"><span>{error}</span><button className="button button-secondary" onClick={() => loadAll({ refresh: true })}>Retry</button></div>}
-        {feedback && <p className="notice notice-success" role="status" aria-live="polite">{feedback}</p>}
+        {error && <div className="notice notice-error" role="alert"><span>{error}</span><Button variant="outline" onClick={() => loadAll({ refresh: true })}>Retry</Button></div>}
         <section className="team-grid" aria-label="Team tasks">
           {teams.map((team) => <TeamColumn key={team._id} team={team} tasks={filterTasks(tasksByTeam[team._id] || [], { query, status })}
             filtered={Boolean(query || status !== 'all')}
@@ -154,8 +154,8 @@ export default function Dashboard() {
             onDeleteTask={(taskId) => mutate(() => api.deleteTask(taskId), 'Task deleted.')}
             onSeedModules={handleSeedModules} />)}
         </section>
-        <section className="dashboard-section" aria-labelledby="plans-heading"><div className="section-heading"><div><p className="eyebrow">ACCOUNTABILITY</p><h2 id="plans-heading">Plans and progress</h2></div></div><div className="detail-grid"><div className="surface"><h3>Post a team plan</h3><PlanUpload teams={teams} defaultTeamId={member?.team?._id} onUpload={(payload) => mutate(() => api.createPlan(payload), 'Plan posted.')} /></div><div className="surface"><h3>Recent plans</h3><PlansList plans={plans} onDelete={(id) => mutate(() => api.deletePlan(id), 'Plan deleted.')} /></div></div></section>
-        <section className="dashboard-section" aria-labelledby="meetings-heading"><div className="section-heading"><div><p className="eyebrow">COORDINATION</p><h2 id="meetings-heading">Meetings</h2></div></div><div className="detail-grid"><div className="surface"><h3>Schedule a meeting</h3><MeetingScheduler teams={teams} onSchedule={async (payload) => { const meeting = await api.createMeeting(payload); await loadAll({ refresh: true }); return meeting; }} /></div><div className="surface"><h3>Schedule</h3><MeetingsList meetings={meetings} onRetry={(id) => mutate(() => api.retryMeeting(id), (meeting) => meeting?.emailStatus === 'sent' ? 'Invitation sent.' : 'Meeting is saved, but invitation delivery is still failing. Try again later.')} /></div></div></section>
+        <section className="dashboard-section" aria-labelledby="plans-heading"><div className="section-heading"><div><p className="eyebrow">ACCOUNTABILITY</p><h2 id="plans-heading">Plans and progress</h2></div></div><div className="detail-grid"><Card className="surface"><h3>Post a team plan</h3><PlanUpload teams={teams} defaultTeamId={member?.team?._id} onUpload={(payload) => mutate(() => api.createPlan(payload), 'Plan posted.')} /></Card><Card className="surface"><h3>Recent plans</h3><PlansList plans={plans} onDelete={(id) => mutate(() => api.deletePlan(id), 'Plan deleted.')} /></Card></div></section>
+        <section className="dashboard-section" aria-labelledby="meetings-heading"><div className="section-heading"><div><p className="eyebrow">COORDINATION</p><h2 id="meetings-heading">Meetings</h2></div></div><div className="detail-grid"><Card className="surface"><h3>Schedule a meeting</h3><MeetingScheduler teams={teams} onSchedule={async (payload) => { const meeting = await api.createMeeting(payload); await loadAll({ refresh: true }); return meeting; }} /></Card><Card className="surface"><h3>Schedule</h3><MeetingsList meetings={meetings} onRetry={(id) => mutate(() => api.retryMeeting(id), (meeting) => meeting?.emailStatus === 'sent' ? 'Invitation sent.' : 'Meeting is saved, but invitation delivery is still failing. Try again later.')} /></Card></div></section>
       </main>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '../../lib/api';
+import { toast } from 'sonner';
 
 function teamId(member) {
   return member.team?._id || member.team || '';
@@ -22,7 +23,6 @@ export default function MembersAdmin() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const [feedback, setFeedback] = useState('');
 
   async function load() {
     setLoading(true);
@@ -51,23 +51,23 @@ export default function MembersAdmin() {
 
   async function createInvite(event) {
     event.preventDefault();
-    setBusy('invite'); setError(''); setFeedback(''); setInviteLink('');
+    setBusy('invite'); setError(''); setInviteLink('');
     try {
       const data = await api.createInvite(form);
       setInviteLink(claimLink(data));
-      setFeedback('Invitation created. Copy the one-time claim link and send it securely.');
+      toast.success('Invitation created. Copy the one-time claim link and send it securely.');
       setForm((previous) => ({ ...previous, name: '', email: '' }));
       await load();
-    } catch (err) { setError(err.message || 'Unable to create invitation.'); } finally { setBusy(''); }
+    } catch (err) { toast.error(err.message || 'Unable to create invitation.'); } finally { setBusy(''); }
   }
 
   async function updateMember(id, payload, message) {
-    setBusy(id); setError(''); setFeedback('');
+    setBusy(id); setError('');
     try {
       await api.updateMember(id, payload);
-      setFeedback(message);
+      toast.success(message);
       await load();
-    } catch (err) { setError(err.message || 'Unable to update member.'); } finally { setBusy(''); }
+    } catch (err) { toast.error(err.message || 'Unable to update member.'); } finally { setBusy(''); }
   }
 
   async function resetAccess(member) {
@@ -76,29 +76,29 @@ export default function MembersAdmin() {
       email = window.prompt(`Email address for ${member.name}`) || '';
       if (!email.trim()) return;
     }
-    setBusy(member._id); setError(''); setFeedback(''); setInviteLink('');
+    setBusy(member._id); setError(''); setInviteLink('');
     try {
       const data = await api.resetMemberAccess(member._id, { email: email.trim() });
       setInviteLink(claimLink(data));
-      setFeedback(`A new access invitation was created for ${member.name}.`);
-    } catch (err) { setError(err.message || 'Unable to reset access.'); } finally { setBusy(''); }
+      toast.success(`A new access invitation was created for ${member.name}.`);
+    } catch (err) { toast.error(err.message || 'Unable to reset access.'); } finally { setBusy(''); }
   }
 
   async function revokeSessions(member) {
     if (!window.confirm(`Sign ${member.name} out on all devices?`)) return;
-    setBusy(member._id); setError(''); setFeedback('');
+    setBusy(member._id); setError('');
     try {
       await api.revokeMemberSessions(member._id);
-      setFeedback(`All sessions for ${member.name} were revoked.`);
-    } catch (err) { setError(err.message || 'Unable to revoke sessions.'); } finally { setBusy(''); }
+      toast.success(`All sessions for ${member.name} were revoked.`);
+    } catch (err) { toast.error(err.message || 'Unable to revoke sessions.'); } finally { setBusy(''); }
   }
 
   async function copyLink() {
     if (!inviteLink) return;
     try {
       await navigator.clipboard.writeText(inviteLink);
-      setFeedback('Invitation link copied.');
-    } catch { setFeedback('Select and copy the invitation link manually.'); }
+      toast.success('Invitation link copied.');
+    } catch { toast.error('Select and copy the invitation link manually.'); }
   }
 
   if (loading) return <main className="loading-page" aria-busy="true"><div className="loading-card"><span className="skeleton-line" /><span className="skeleton-line short" /><span className="skeleton-grid" /></div><p>Loading members…</p></main>;
@@ -108,7 +108,6 @@ export default function MembersAdmin() {
     <main className="admin-main">
       <div className="admin-heading"><div><p className="eyebrow">ACCESS CONTROL</p><h1>Members</h1><p className="muted">Invite teammates and keep account access current.</p></div><Link className="button button-secondary" href="/dashboard">Back to board</Link></div>
       {error && <div className="notice notice-error" role="alert">{error}</div>}
-      {feedback && <div className="notice notice-success" role="status" aria-live="polite">{feedback}</div>}
       {inviteLink && <section className="surface invite-link-panel" aria-labelledby="invite-link-title"><h2 id="invite-link-title">One-time invitation link</h2><p className="form-hint">Send this link privately. It is shown only now and expires.</p><div className="invite-link-row"><input value={inviteLink} readOnly aria-label="Invitation claim link" onFocus={(event) => event.target.select()} /><button className="button button-secondary" type="button" onClick={copyLink}>Copy link</button></div></section>}
       <section className="surface" aria-labelledby="invite-heading"><h2 id="invite-heading">Invite member</h2><form className="admin-invite-form" onSubmit={createInvite}>
         <label>Name<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} autoComplete="name" required /></label>

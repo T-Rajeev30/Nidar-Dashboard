@@ -1,6 +1,7 @@
 // Single responsibility: form to upload a plan/progress entry for a chosen
 // team — text content, an optional file link, a phase tag, and a date.
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { localDateInputValue } from '../lib/dashboard-utils.mjs';
 
 const PHASES = [
@@ -18,17 +19,15 @@ export default function PlanUpload({ teams, defaultTeamId, onUpload }) {
   const [phase, setPhase] = useState('simulation');
   const [forDate, setForDate] = useState(localDateInputValue());
   const [submitting, setSubmitting] = useState(false);
-  const [status, setStatus] = useState(null);
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (!teamId || !title.trim() || !forDate) {
-      setStatus({ ok: false, message: 'Team, title, and date are required.' });
+      toast.error('Team, title, and date are required.');
       return;
     }
 
     setSubmitting(true);
-    setStatus(null);
     try {
       const saved = await onUpload({
         team: teamId,
@@ -39,15 +38,13 @@ export default function PlanUpload({ teams, defaultTeamId, onUpload }) {
         forDate,
       });
       if (!saved) {
-        setStatus({ ok: false, message: 'Plan was not posted. Your draft is still here—review the error and try again.' });
         return;
       }
-      setStatus({ ok: true, message: 'Plan uploaded.' });
       setTitle('');
       setContent('');
       setFileUrl('');
     } catch (err) {
-      setStatus({ ok: false, message: err.message });
+      toast.error(err.message || 'Unable to post this plan.');
     } finally {
       setSubmitting(false);
     }
@@ -103,12 +100,6 @@ export default function PlanUpload({ teams, defaultTeamId, onUpload }) {
       <button style={styles.submitBtn} disabled={submitting}>
         {submitting ? 'Uploading…' : 'Upload plan'}
       </button>
-
-      {status && (
-        <p style={{ ...styles.status, color: status.ok ? 'var(--done)' : 'var(--status-blocked)' }}>
-          {status.message}
-        </p>
-      )}
     </form>
   );
 }
@@ -146,5 +137,4 @@ const styles = {
     fontWeight: 600,
     fontSize: 13,
   },
-  status: { fontSize: 13, margin: 0 },
 };

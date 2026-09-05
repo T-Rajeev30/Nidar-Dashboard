@@ -2,6 +2,7 @@
 // agenda, check off attendees from any team, submit. Emailing happens
 // server-side once this posts.
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 export default function MeetingScheduler({ teams, onSchedule }) {
   const [title, setTitle] = useState('');
@@ -10,7 +11,6 @@ export default function MeetingScheduler({ teams, onSchedule }) {
   const [scheduledAt, setScheduledAt] = useState('');
   const [selected, setSelected] = useState([]);
   const [submitting, setSubmitting] = useState(false);
-  const [status, setStatus] = useState(null); // { ok, message }
 
   function toggleMember(memberId) {
     setSelected((prev) =>
@@ -21,12 +21,11 @@ export default function MeetingScheduler({ teams, onSchedule }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!title.trim() || !scheduledAt || selected.length === 0) {
-      setStatus({ ok: false, message: 'Title, time, and at least one attendee are required.' });
+      toast.error('Title, time, and at least one attendee are required.');
       return;
     }
 
     setSubmitting(true);
-    setStatus(null);
     try {
       const meeting = await onSchedule({
         title: title.trim(),
@@ -35,18 +34,15 @@ export default function MeetingScheduler({ teams, onSchedule }) {
         scheduledAt: new Date(scheduledAt).toISOString(),
         inviteeIds: selected,
       });
-      setStatus(
-        meeting.emailStatus === 'sent'
-          ? { ok: true, message: `Invite emailed to ${selected.length} attendee(s).` }
-          : { ok: false, message: 'Meeting saved, but the invite email failed to send.' }
-      );
+      if (meeting.emailStatus === 'sent') toast.success(`Invite emailed to ${selected.length} attendee(s).`);
+      else toast.error('Meeting was saved, but the invite email failed to send.');
       setTitle('');
       setAgenda('');
       setMeetLink('');
       setScheduledAt('');
       setSelected([]);
     } catch (err) {
-      setStatus({ ok: false, message: err.message });
+      toast.error(err.message || 'Unable to schedule this meeting.');
     } finally {
       setSubmitting(false);
     }
@@ -111,12 +107,6 @@ export default function MeetingScheduler({ teams, onSchedule }) {
       <button style={styles.submitBtn} disabled={submitting}>
         {submitting ? 'Scheduling & emailing…' : 'Schedule & send invites'}
       </button>
-
-      {status && (
-        <p style={{ ...styles.status, color: status.ok ? 'var(--done)' : 'var(--status-blocked)' }}>
-          {status.message}
-        </p>
-      )}
     </form>
   );
 }
@@ -160,5 +150,4 @@ const styles = {
     fontWeight: 600,
     fontSize: 13,
   },
-  status: { fontSize: 13, margin: 0 },
 };
