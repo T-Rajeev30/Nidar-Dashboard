@@ -1,4 +1,4 @@
-// Single responsibility: idempotently make sure the 3 fixed teams exist.
+// Single responsibility: idempotently make sure the four fixed teams exist.
 // Run automatically on server start, and can also be run manually:
 //   node seed.js
 const { TEAMS } = require('./constants/teams');
@@ -25,7 +25,7 @@ if (require.main === module) {
     .then(seedTeams)
     .then(() => process.exit(0))
     .catch((err) => {
-      console.error(err);
+      console.error('[seed] failed');
       process.exit(1);
     });
 }

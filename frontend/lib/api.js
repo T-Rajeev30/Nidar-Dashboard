@@ -42,7 +42,10 @@ export const api = {
   login: (email, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   getCurrentMember: () => request('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),
-  getInvite: (token) => request(`/auth/invite/${encodeURIComponent(token)}`),
+  getInvite: async (token) => {
+    const data = await request(`/auth/invite/${encodeURIComponent(token)}`);
+    return data.invitation || data.invite || data;
+  },
   claimInvite: (token, password) => request('/auth/claim-invite', { method: 'POST', body: JSON.stringify({ token, password }) }),
   getTeams: () => request('/teams'),
   getTasks: (teamId) => request(`/tasks${teamId ? `?team=${teamId}` : ''}`),
@@ -65,7 +68,7 @@ export const api = {
   deletePlan: (id) => request(`/plans/${id}`, { method: 'DELETE' }),
   getAdminMembers: () => request('/admin/members'),
   createInvite: (payload) => request('/admin/invites', { method: 'POST', body: JSON.stringify(payload) }),
-  resetMemberAccess: (id) => request(`/admin/members/${encodeURIComponent(id)}/reset-access`, { method: 'POST' }),
+  resetMemberAccess: (id, payload = {}) => request(`/admin/members/${encodeURIComponent(id)}/reset-access`, { method: 'POST', body: JSON.stringify(payload) }),
   updateMember: (id, payload) => request(`/admin/members/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   revokeMemberSessions: (id) => request(`/admin/members/${encodeURIComponent(id)}/revoke-sessions`, { method: 'POST' }),
 };

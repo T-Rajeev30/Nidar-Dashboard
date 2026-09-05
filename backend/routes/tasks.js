@@ -62,10 +62,11 @@ router.post('/', async (req, res, next) => {
     if (subProblemRef != null && (!Number.isInteger(subProblemRef) || subProblemRef < 1 || subProblemRef > 15)) throw new ValidationError('subProblemRef must be between 1 and 15.');
     assertOwnTeam(req.member, team);
     const [teamDoc, assigneeDoc] = await Promise.all([
-      Team.exists({ _id: team }), assignee ? Member.findById(assignee).select('team').lean() : null,
+      Team.exists({ _id: team }), assignee ? Member.findById(assignee).select('team status').lean() : null,
     ]);
     if (!teamDoc) return res.status(404).json({ error: 'Team not found.', code: 'NOT_FOUND' });
     if (assignee && !assigneeDoc) return res.status(404).json({ error: 'Assignee not found.', code: 'NOT_FOUND' });
+    if (assigneeDoc && assigneeDoc.status !== 'active') throw new ValidationError('Assignee must have an active account.');
     if (assigneeDoc && String(assigneeDoc.team) !== team) throw new ValidationError('Assignee must belong to the task team.');
 
     const task = await Task.create({
@@ -105,8 +106,9 @@ router.patch('/:id', async (req, res, next) => {
     if ('assignee' in updates) {
       updates.assignee = optionalObjectId(updates.assignee, 'assignee');
       if (updates.assignee) {
-        const assignee = await Member.findById(updates.assignee).select('team').lean();
+        const assignee = await Member.findById(updates.assignee).select('team status').lean();
         if (!assignee) return res.status(404).json({ error: 'Assignee not found.', code: 'NOT_FOUND' });
+        if (assignee.status !== 'active') throw new ValidationError('Assignee must have an active account.');
         if (String(assignee.team) !== String(current.team)) throw new ValidationError('Assignee must belong to the task team.');
       }
     }

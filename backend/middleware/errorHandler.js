@@ -4,7 +4,7 @@ function errorHandler(err, req, res, next) { // eslint-disable-line no-unused-va
   // Keep server logs useful without copying database, SMTP, or request data.
   console.error('[error]', err.name || 'Error', err.code || 'UNCLASSIFIED');
   if (err.code === 11000) {
-    return res.status(409).json({ error: 'That name is already taken. Try a different one.', code: 'CONFLICT' });
+    return res.status(409).json({ error: 'That record already exists.', code: 'CONFLICT' });
   }
   if (err.name === 'CastError') {
     return res.status(400).json({ error: 'One of the supplied IDs is invalid.', code: 'VALIDATION_ERROR' });

@@ -28,7 +28,9 @@ export default function ClaimInvite() {
     let active = true;
     api.getInvite(rawToken).then((data) => {
       if (!active) return;
-      setInvite(data.invite || data);
+      // The API names the envelope `invitation`; accept the legacy `invite`
+      // alias as well so a partially upgraded backend cannot blank the preview.
+      setInvite(data.invitation || data.invite || data);
     }).catch((err) => {
       if (!active) return;
       setError(err instanceof ApiError && err.status === 0
@@ -72,6 +74,7 @@ export default function ClaimInvite() {
               <div><dt>Role</dt><dd>{invite.role || 'Member'}</dd></div>
             </dl>
             <form className="stack-form" onSubmit={handleSubmit} noValidate>
+              <input className="sr-only" type="email" value={invite.email || ''} autoComplete="username" readOnly tabIndex="-1" aria-hidden="true" />
               <label htmlFor="new-password">Password</label>
               <div className="password-field">
                 <input id="new-password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} required />

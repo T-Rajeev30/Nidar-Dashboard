@@ -71,9 +71,14 @@ export default function MembersAdmin() {
   }
 
   async function resetAccess(member) {
+    let email = member.email;
+    if (!email) {
+      email = window.prompt(`Email address for ${member.name}`) || '';
+      if (!email.trim()) return;
+    }
     setBusy(member._id); setError(''); setFeedback(''); setInviteLink('');
     try {
-      const data = await api.resetMemberAccess(member._id);
+      const data = await api.resetMemberAccess(member._id, { email: email.trim() });
       setInviteLink(claimLink(data));
       setFeedback(`A new access invitation was created for ${member.name}.`);
     } catch (err) { setError(err.message || 'Unable to reset access.'); } finally { setBusy(''); }

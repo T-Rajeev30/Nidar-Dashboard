@@ -33,7 +33,7 @@ npm run build
 
 1. Push this `frontend/` folder to a GitHub repo (can be the same repo as the backend, different root directory)
 2. vercel.com → New Project → import the repo → set root directory to `frontend`
-3. Add environment variable `NEXT_PUBLIC_API_URL` = your Render backend URL (e.g. `https://nidar-backend.onrender.com`)
+3. Add environment variable `NEXT_PUBLIC_API_URL` = your Render backend URL (e.g. `https://nidar-backend.onrender.com`). If you are a collaborator rather than the Vercel project owner, ask the owner to set this variable and redeploy.
 4. Deploy
 
 Once deployed, go back to your Render backend's `CORS_ORIGIN` env var and set it to this Vercel URL, then redeploy the backend.

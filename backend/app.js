@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { errorHandler } = require('./middleware/errorHandler');
 const teamsRouter = require('./routes/teams');
 const membersRouter = require('./routes/members');
@@ -7,14 +9,21 @@ const tasksRouter = require('./routes/tasks');
 const authRouter = require('./routes/auth');
 const meetingsRouter = require('./routes/meetings');
 const plansRouter = require('./routes/plans');
+const adminRouter = require('./routes/admin');
 const { MISSION_DEADLINE } = require('./constants/mission');
 const { requireAuth, requireSameOrigin } = require('./utils/auth');
+const { rateLimitHandler } = require('./utils/rateLimit');
 
 const app = express();
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
   .split(',').map((origin) => origin.trim()).filter(Boolean);
 
 app.disable('x-powered-by');
+if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
+// The API does not serve frontend scripts, so Helmet's default CSP is safe to
+// keep enabled. Resource policy remains relaxed for credentialed cross-origin
+// API responses from the explicitly allowed frontend origin.
+app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use((req, res, next) => {
   res.set({
     'X-Content-Type-Options': 'nosniff',
@@ -28,6 +37,8 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: '100kb' }));
+const limiterOptions = { standardHeaders: 'draft-7', legacyHeaders: false, handler: rateLimitHandler, skip: () => process.env.NODE_ENV === 'test' };
+app.use('/api', rateLimit({ ...limiterOptions, windowMs: 60 * 1000, limit: 120 }));
 // SameSite cookies protect normal browser navigation. The explicit Origin
 // check also protects cookie-authenticated mutations when production uses
 // SameSite=None for a separately hosted frontend/API.
@@ -35,6 +46,7 @@ app.use('/api', requireSameOrigin(allowedOrigins));
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.get('/api/mission', (req, res) => res.json({ deadline: MISSION_DEADLINE }));
 app.use('/api/auth', authRouter);
+app.use('/api/admin', rateLimit({ ...limiterOptions, windowMs: 15 * 60 * 1000, limit: 10 }), adminRouter);
 app.use('/api/teams', requireAuth, teamsRouter);
 app.use('/api/members', requireAuth, membersRouter);
 app.use('/api/tasks', requireAuth, tasksRouter);

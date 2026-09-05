@@ -35,6 +35,7 @@ router.post('/', async (req, res, next) => {
 
     const invitees = await Member.find({ _id: { $in: inviteeIds } });
     if (invitees.length !== inviteeIds.length) return res.status(404).json({ error: 'One or more invitees were not found.', code: 'NOT_FOUND' });
+    if (invitees.some((invitee) => invitee.status !== 'active')) throw new ValidationError('All invitees must have active accounts.');
     const meeting = await Meeting.create({
       title,
       agenda,

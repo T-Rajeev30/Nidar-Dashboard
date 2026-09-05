@@ -12,7 +12,9 @@ async function connectDB() {
   console.log('[db] connected to MongoDB');
 
   mongoose.connection.on('error', (err) => {
-    console.error('[db] connection error:', err.message);
+    // Driver messages can echo connection details; keep production logs
+    // generic and rely on the process-level monitor for diagnostics.
+    console.error('[db] connection error');
   });
 
   return mongoose.connection;

@@ -25,7 +25,15 @@ function parseCookies(header) {
     const separator = part.indexOf('=');
     if (separator < 0) return cookies;
     const key = part.slice(0, separator).trim();
-    if (key) cookies[key] = decodeURIComponent(part.slice(separator + 1).trim());
+    if (key) {
+      const value = part.slice(separator + 1).trim();
+      try {
+        cookies[key] = decodeURIComponent(value);
+      } catch {
+        // Malformed cookie values are untrusted input, not server errors.
+        cookies[key] = '';
+      }
+    }
     return cookies;
   }, {});
 }
@@ -35,13 +43,15 @@ function publicMember(member) {
   return {
     _id: member._id,
     name: member.name,
+    email: member.email,
     team: member.team,
-    role: member.role || '',
+    role: member.role || 'member',
+    status: member.status || 'invited',
   };
 }
 
 async function issueSession(res, member) {
-  // Rotate any existing session on login/join to limit session fixation.
+  // Rotate any existing session on login/claim to limit session fixation.
   const cookies = parseCookies(res.req?.headers?.cookie);
   if (cookies[SESSION_COOKIE]) await Session.deleteOne({ tokenHash: hashToken(cookies[SESSION_COOKIE]) });
   const token = crypto.randomBytes(32).toString('base64url');
@@ -54,14 +64,29 @@ async function requireAuth(req, res, next) {
     const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
     if (!token || token.length > 200) throw new AppError('Authentication required.', 401, 'UNAUTHENTICATED');
     const session = await Session.findOne({ tokenHash: hashToken(token), expiresAt: { $gt: new Date() } })
-      .populate({ path: 'member', populate: { path: 'team' } });
-    if (!session || !session.member) throw new AppError('Authentication required.', 401, 'UNAUTHENTICATED');
+      .populate({ path: 'member', select: '+passwordHash name email team role status', populate: { path: 'team' } });
+    if (!session || !session.member || session.member.status === 'disabled' || session.member.status !== 'active' || !session.member.passwordHash) {
+      if (session) await Session.deleteOne({ _id: session._id });
+      throw new AppError('Authentication required.', 401, 'UNAUTHENTICATED');
+    }
     req.member = session.member;
     req.session = session;
     next();
   } catch (err) {
     next(err);
   }
+}
+
+function requireAdmin(req, res, next) {
+  if (!req.member || req.member.status !== 'active') {
+    return next(new AppError('Authentication required.', 401, 'UNAUTHENTICATED'));
+  }
+  if (req.member.role !== 'admin') return next(new AppError('Administrator access required.', 403, 'FORBIDDEN'));
+  return next();
+}
+
+async function revokeAllSessions(memberId) {
+  return Session.deleteMany({ member: memberId });
 }
 
 async function revokeSession(req) {
@@ -97,7 +122,9 @@ module.exports = {
   publicMember,
   issueSession,
   requireAuth,
+  requireAdmin,
   revokeSession,
+  revokeAllSessions,
   clearSession,
   requireSameOrigin,
   assertOwnTeam,

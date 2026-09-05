@@ -12,6 +12,6 @@ connectDB()
     app.listen(PORT, () => console.log(`[server] listening on port ${PORT}`));
   })
   .catch((err) => {
-    console.error('[server] failed to start:', err.message);
+    console.error('[server] failed to start');
     process.exit(1);
   });

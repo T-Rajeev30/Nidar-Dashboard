@@ -36,7 +36,7 @@ router.get('/phases', (req, res) => {
   res.json(PHASES);
 });
 
-// POST /api/plans  { team, title, content, fileUrl, phase, forDate, createdBy }
+// POST /api/plans  { team, title, content, fileUrl, phase, forDate }
 router.post('/', async (req, res, next) => {
   try {
     const team = parseObjectId(req.body.team, 'team');

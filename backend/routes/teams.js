@@ -13,7 +13,9 @@ router.get('/', async (req, res, next) => {
     const teams = await Team.find().sort({ key: 1 }).lean();
     const ids = teams.map((team) => team._id);
     const [members, tasks] = await Promise.all([
-      Member.find({ team: { $in: ids } }).select('name role team').lean(),
+      // Only active accounts are actionable assignees/attendees. Pending or
+      // disabled records remain visible to administrators, not the workboard.
+      Member.find({ team: { $in: ids }, status: 'active' }).select('name role team status').lean(),
       Task.find({ team: { $in: ids } }).select('status team').lean(),
     ]);
     const membersByTeam = new Map(ids.map((id) => [String(id), []]));

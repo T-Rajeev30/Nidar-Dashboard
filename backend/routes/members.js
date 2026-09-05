@@ -12,7 +12,7 @@ router.get('/', async (req, res, next) => {
     const filter = {};
     if (req.query.team) filter.team = parseObjectId(req.query.team, 'team');
 
-    const members = await Member.find(filter).select('name role team').lean();
+    const members = await Member.find(filter).select('name role team status').lean();
     res.json(members);
   } catch (err) {
     next(err);
