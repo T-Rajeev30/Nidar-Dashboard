@@ -1,8 +1,16 @@
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
+import TaskForm from './tasks/TaskForm';
+import { Button } from './ui/button';
 
 export default function AddTaskForm({ onAdd }) {
-  const [open, setOpen] = useState(false); const [title, setTitle] = useState(''); const [subProblemRef, setSubProblemRef] = useState(''); const [busy, setBusy] = useState(false); const [message, setMessage] = useState('');
-  async function submit(event) { event.preventDefault(); if (!title.trim()) return setMessage('Give this task a title.'); setBusy(true); setMessage(''); const saved = await onAdd({ title: title.trim(), subProblemRef: subProblemRef ? Number(subProblemRef) : null }); setBusy(false); if (saved) { setTitle(''); setSubProblemRef(''); setOpen(false); } else setMessage('Task was not added. Review the error above and try again.'); }
-  if (!open) return <button className="add-task-button" type="button" onClick={() => setOpen(true)}>Add task</button>;
-  return <form className="add-task-form" onSubmit={submit}><label className="sr-only" htmlFor="task-title">Task title</label><input id="task-title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Next task" autoFocus maxLength="240" /><label className="sr-only" htmlFor="sub-problem">Sub-problem reference</label><input id="sub-problem" type="number" min="1" max="15" value={subProblemRef} onChange={(event) => setSubProblemRef(event.target.value)} placeholder="SP#" /><button className="button button-primary" disabled={busy}>{busy ? 'Adding…' : 'Add'}</button><button className="button button-quiet" type="button" onClick={() => { setOpen(false); setMessage(''); }}>Cancel</button><p className="form-message" role="status">{message}</p></form>;
+  const [open, setOpen] = useState(false);
+
+  if (!open) return <Button variant="outline" className="add-task-button" type="button" onClick={() => setOpen(true)}><Plus />Add task</Button>;
+
+  return <TaskForm compact submitLabel="Add task" onCancel={() => setOpen(false)} onSave={async ({ title, subProblemRef }) => {
+    const saved = await onAdd({ title, subProblemRef });
+    if (saved) setOpen(false);
+    return saved;
+  }} />;
 }

@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
 import { api, ApiError } from '../lib/api';
 import { clearMember } from '../lib/session';
 import { filterTasks } from '../lib/dashboard-utils.mjs';
 import Header from '../components/Header';
-import TeamColumn from '../components/TeamColumn';
 import TaskToolbar from '../components/TaskToolbar';
 import MeetingScheduler from '../components/MeetingScheduler';
 import MeetingsList from '../components/MeetingsList';
@@ -13,6 +13,12 @@ import PlansList from '../components/PlansList';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
+import AddTaskForm from '../components/AddTaskForm';
+import TasksDataTable from '../components/tasks/TasksDataTable';
+import TaskDetailSheet from '../components/tasks/TaskDetailSheet';
+import { createDashboardMetrics } from '../lib/dashboard-metrics.mjs';
+
+const DashboardMetrics = dynamic(() => import('../components/DashboardMetrics'), { ssr: false });
 
 export default function Dashboard() {
   const router = useRouter();
@@ -27,6 +33,7 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
+  const [selectedTask, setSelectedTask] = useState(null);
 
   const redirectToSignIn = useCallback(() => {
     clearMember();
@@ -113,11 +120,14 @@ export default function Dashboard() {
     return result;
   }
 
+  const allTasks = useMemo(() => Object.values(tasksByTeam).flat(), [tasksByTeam]);
+
   const overallProgress = useMemo(() => {
-    const all = Object.values(tasksByTeam).flat();
-    const done = all.filter((task) => task.status === 'done').length;
-    return { total: all.length, done, percent: all.length ? Math.round((done / all.length) * 100) : 0 };
-  }, [tasksByTeam]);
+    const done = allTasks.filter((task) => task.status === 'done').length;
+    return { total: allTasks.length, done, percent: allTasks.length ? Math.round((done / allTasks.length) * 100) : 0 };
+  }, [allTasks]);
+  const metrics = useMemo(() => createDashboardMetrics({ tasks: allTasks, meetings, teams }), [allTasks, meetings, teams]);
+  const visibleTasks = useMemo(() => filterTasks(allTasks, { query, status }), [allTasks, query, status]);
 
   const handleSignOut = useCallback(async () => {
     try {
@@ -145,17 +155,12 @@ export default function Dashboard() {
           <div><p className="eyebrow">OPERATIONS</p><h2>Team workboard</h2><p className="muted">Track work, unblock teammates, and keep the mission moving.</p></div>
           <TaskToolbar query={query} status={status} onQueryChange={setQuery} onStatusChange={setStatus} onRefresh={() => loadAll({ refresh: true })} refreshing={refreshing} />
         </div>
+        <DashboardMetrics metrics={metrics} />
         {error && <div className="notice notice-error" role="alert"><span>{error}</span><Button variant="outline" onClick={() => loadAll({ refresh: true })}>Retry</Button></div>}
-        <section className="team-grid" aria-label="Team tasks">
-          {teams.map((team) => <TeamColumn key={team._id} team={team} tasks={filterTasks(tasksByTeam[team._id] || [], { query, status })}
-            filtered={Boolean(query || status !== 'all')}
-            onAddTask={(teamId, payload) => mutate(() => api.createTask({ ...payload, team: teamId }), 'Task added.')}
-            onUpdateTask={(taskId, updates) => mutate(() => api.updateTask(taskId, updates), 'Task updated.')}
-            onDeleteTask={(taskId) => mutate(() => api.deleteTask(taskId), 'Task deleted.')}
-            onSeedModules={handleSeedModules} />)}
-        </section>
+        <section aria-label="Team tasks"><TasksDataTable tasks={visibleTasks} teams={teams} onTaskClick={setSelectedTask} /><div className="task-create-grid" aria-label="Add a task by team">{teams.map((team) => <div key={team._id}><h3>{team.displayName}</h3><AddTaskForm onAdd={(payload) => mutate(() => api.createTask({ ...payload, team: team._id }), 'Task added.')} /></div>)}</div></section>
         <section className="dashboard-section" aria-labelledby="plans-heading"><div className="section-heading"><div><p className="eyebrow">ACCOUNTABILITY</p><h2 id="plans-heading">Plans and progress</h2></div></div><div className="detail-grid"><Card className="surface"><h3>Post a team plan</h3><PlanUpload teams={teams} defaultTeamId={member?.team?._id} onUpload={(payload) => mutate(() => api.createPlan(payload), 'Plan posted.')} /></Card><Card className="surface"><h3>Recent plans</h3><PlansList plans={plans} onDelete={(id) => mutate(() => api.deletePlan(id), 'Plan deleted.')} /></Card></div></section>
         <section className="dashboard-section" aria-labelledby="meetings-heading"><div className="section-heading"><div><p className="eyebrow">COORDINATION</p><h2 id="meetings-heading">Meetings</h2></div></div><div className="detail-grid"><Card className="surface"><h3>Schedule a meeting</h3><MeetingScheduler teams={teams} onSchedule={async (payload) => { const meeting = await api.createMeeting(payload); await loadAll({ refresh: true }); return meeting; }} /></Card><Card className="surface"><h3>Schedule</h3><MeetingsList meetings={meetings} onRetry={(id) => mutate(() => api.retryMeeting(id), (meeting) => meeting?.emailStatus === 'sent' ? 'Invitation sent.' : 'Meeting is saved, but invitation delivery is still failing. Try again later.')} /></Card></div></section>
+        <TaskDetailSheet task={selectedTask} team={teams.find((team) => team._id === (selectedTask?.team?._id || selectedTask?.team))} onClose={() => setSelectedTask(null)} onSave={(taskId, updates) => mutate(() => api.updateTask(taskId, updates), 'Task updated.')} onDelete={(taskId) => mutate(() => api.deleteTask(taskId), 'Task deleted.')} />
       </main>
     </div>
   );
