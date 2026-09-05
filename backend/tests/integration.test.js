@@ -115,8 +115,10 @@ test('password login is generic and never serializes password hashes', async () 
 });
 
 test('production sessions set Secure and cross-site SameSite=None cookie attributes', async () => {
-  const previous = process.env.NODE_ENV;
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousSameSite = process.env.SESSION_SAME_SITE;
   process.env.NODE_ENV = 'production';
+  delete process.env.SESSION_SAME_SITE;
   try {
     const response = await request('/api/auth/login', { method: 'POST', body: json({ email: alice.email, password }) });
     assert.equal(response.status, 200);
@@ -125,7 +127,10 @@ test('production sessions set Secure and cross-site SameSite=None cookie attribu
     assert.match(cookie, /SameSite=None/i);
     assert.match(cookie, /HttpOnly/i);
   } finally {
-    process.env.NODE_ENV = previous;
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+    if (previousSameSite === undefined) delete process.env.SESSION_SAME_SITE;
+    else process.env.SESSION_SAME_SITE = previousSameSite;
   }
 });
 
