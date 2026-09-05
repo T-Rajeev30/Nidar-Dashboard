@@ -16,6 +16,7 @@ import { Card } from '../components/ui/card';
 import AddTaskForm from '../components/AddTaskForm';
 import TasksDataTable from '../components/tasks/TasksDataTable';
 import TaskDetailSheet from '../components/tasks/TaskDetailSheet';
+import MissionSidebar from '../components/MissionSidebar';
 import { createDashboardMetrics } from '../lib/dashboard-metrics.mjs';
 import { applyTaskUpdate } from '../lib/task-state.mjs';
 
@@ -36,6 +37,7 @@ export default function Dashboard() {
   const [status, setStatus] = useState('all');
   const [selectedTask, setSelectedTask] = useState(null);
   const [updatingTaskId, setUpdatingTaskId] = useState('');
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
 
   const redirectToSignIn = useCallback(() => {
     clearMember();
@@ -173,7 +175,9 @@ export default function Dashboard() {
 
   return (
     <div className="app-shell">
-      <Header member={member} overallProgress={overallProgress} deadline={deadline} onSignOut={handleSignOut} />
+      <MissionSidebar isAdmin={member?.role === 'admin'} mobileOpen={mobileNavigationOpen} onMobileOpenChange={setMobileNavigationOpen} />
+      <div className="app-content">
+      <Header member={member} overallProgress={overallProgress} deadline={deadline} onSignOut={handleSignOut} onOpenNavigation={() => setMobileNavigationOpen(true)} />
       <main className="dashboard-main">
         <div className="page-intro">
           <div><p className="eyebrow">OPERATIONS</p><h2>Team workboard</h2><p className="muted">Track work, unblock teammates, and keep the mission moving.</p></div>
@@ -186,6 +190,7 @@ export default function Dashboard() {
         <section className="dashboard-section" aria-labelledby="meetings-heading"><div className="section-heading"><div><p className="eyebrow">COORDINATION</p><h2 id="meetings-heading">Meetings</h2></div></div><div className="detail-grid"><Card className="surface" id="schedule-meeting"><h3>Schedule a meeting</h3><MeetingScheduler teams={teams} onSchedule={async (payload) => { const meeting = await api.createMeeting(payload); await loadAll({ refresh: true }); return meeting; }} /></Card><Card className="surface"><h3>Schedule</h3><MeetingsList meetings={meetings} onRetry={(id) => mutate(() => api.retryMeeting(id), (meeting) => meeting?.emailStatus === 'sent' ? 'Invitation sent.' : 'Meeting is saved, but invitation delivery is still failing. Try again later.')} /></Card></div></section>
         <TaskDetailSheet task={selectedTask} team={teams.find((team) => team._id === (selectedTask?.team?._id || selectedTask?.team))} onClose={() => setSelectedTask(null)} onSave={updateTaskOptimistically} onDelete={(taskId) => mutate(() => api.deleteTask(taskId), 'Task deleted.')} />
       </main>
+      </div>
     </div>
   );
 }
