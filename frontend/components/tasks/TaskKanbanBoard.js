@@ -30,7 +30,7 @@ function KanbanCard({ task, onTaskClick }) {
   </button>;
 }
 
-export default function TaskKanbanBoard({ tasks, onStatusChange, onTaskClick, updatingTaskId }) {
+export default function TaskKanbanBoard({ tasks, onStatusChange, onTaskClick, updatingTaskId, emptyAction }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
   const [activeId, setActiveId] = useState(null);
   function handleDragEnd({ active, over }) {
@@ -40,7 +40,8 @@ export default function TaskKanbanBoard({ tasks, onStatusChange, onTaskClick, up
     const nextStatus = String(over.id).replace(/^status:/, '');
     if (task && task.status !== nextStatus && updatingTaskId !== task._id) onStatusChange(task._id, { status: nextStatus });
   }
-  return <div className="kanban-board-wrap"><p className="sr-only">Drag a task with the mouse or keyboard to change its status. Double-click or choose Open task to edit.</p><DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={({ active }) => setActiveId(active.id)} onDragCancel={() => setActiveId(null)} onDragEnd={handleDragEnd}>
+  if (!tasks.length) return <div className="kanban-empty"><p>No tasks match the current filters.</p>{emptyAction}</div>;
+  return <div className="kanban-board-wrap"><p className="sr-only">Drag a task with the mouse or keyboard to change its status. Activate a task card to edit.</p><DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={({ active }) => setActiveId(active.id)} onDragCancel={() => setActiveId(null)} onDragEnd={handleDragEnd}>
     <div className="kanban-board" data-active-task={activeId || undefined}>{STATUSES.map(([status, label]) => <KanbanColumn key={status} status={status} label={label} tasks={tasks.filter((task) => task.status === status)} onTaskClick={onTaskClick} />)}</div>
   </DndContext></div>;
 }
